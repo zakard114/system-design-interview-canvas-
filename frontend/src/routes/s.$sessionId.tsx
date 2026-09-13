@@ -24,6 +24,7 @@ import {
 } from "@/components/canvas/tools";
 import { joinLink } from "@/lib/session-link";
 import { clamp } from "@/lib/canvas-geometry";
+import { isUsingMockService } from "@/services";
 import type {
   EdgeObject,
   NewCanvasObject,
@@ -569,12 +570,15 @@ function SessionPage() {
   };
 
   if (notFound) {
+    const mockMode = isUsingMockService();
     return (
       <main className="flex min-h-screen items-center justify-center grid-paper px-5">
         <div className="panel max-w-md p-6 text-center">
-          <h1 className="text-xl font-semibold">This room doesn't exist</h1>
+          <h1 className="text-xl font-semibold">This room isn&apos;t here</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            The link may be wrong or the room was never created in this browser.
+            {mockMode
+              ? "Demo mode stores rooms only in this browser's localStorage. If the host created the room in another browser (or a private window), this tab cannot see it. Open the join link in another tab of the same browser where the room was created."
+              : "The link may be wrong, or the room was never created / already expired."}
           </p>
           <Link
             to="/"
@@ -725,6 +729,11 @@ function SessionPage() {
             <Link2 className="size-3.5" />
             {joinLink(sessionId)}
           </span>
+          {isUsingMockService() ? (
+            <span className="w-full text-[11px] leading-snug text-muted-foreground sm:w-auto">
+              Demo: paste in another tab of this browser. Other browsers won&apos;t see the room yet.
+            </span>
+          ) : null}
         </div>
 
         <div className="flex flex-col items-end gap-1.5 pt-0.5">
@@ -869,6 +878,7 @@ function SessionPage() {
                   selected={selected}
                   selectedCount={selectedIds.length}
                   participants={participants}
+                  meId={me?.id}
                   widthPx={isLg ? inspectorWidth : undefined}
                   heightPx={!isLg ? inspectorHeight : undefined}
                   onUpdate={(id, patch) => void updateObject(id, patch)}

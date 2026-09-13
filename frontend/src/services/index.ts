@@ -12,10 +12,16 @@ export {
 
 let instance: InterviewService | null = null;
 
+/**
+ * Frontend First default: in-browser mock (localStorage + cross-tab sync).
+ * Set VITE_USE_MOCK=false to use the HTTP/WebSocket client → FastAPI.
+ */
+export function isUsingMockService(): boolean {
+  return import.meta.env.VITE_USE_MOCK !== "false";
+}
+
 function resolveDefaultService(): InterviewService {
-  // Keep mock available for tests / offline: VITE_USE_MOCK=true
-  const useMock = import.meta.env.VITE_USE_MOCK === "true";
-  if (useMock) {
+  if (isUsingMockService()) {
     return createBrowserMockInterviewService();
   }
   const baseUrl =
@@ -26,8 +32,7 @@ function resolveDefaultService(): InterviewService {
 
 /**
  * The single entry point for backend access in the app.
- * Default: HTTP/WebSocket client → FastAPI (openapi.yaml).
- * Set VITE_USE_MOCK=true to use the local mock instead.
+ * Default: browser mock (no backend). Set VITE_USE_MOCK=false for FastAPI.
  */
 export function getInterviewService(): InterviewService {
   if (!instance) {

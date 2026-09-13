@@ -319,4 +319,23 @@ describe("MockInterviewService — persistence intent", () => {
     expect(await restarted.listParticipants(session.id)).toHaveLength(1);
     expect((await restarted.listObjects(session.id))[0]).toMatchObject({ label: "nginx" });
   });
+
+  it("second client finds a room created earlier via shared storage (join-link tab)", async () => {
+    const persistence = memoryPersistence();
+    // Tab A already open on the home page — empty in-memory store.
+    const earlyTab = createMockInterviewService({ persistence });
+    expect(await earlyTab.getSession("missing")).toBeNull();
+
+    const host = createMockInterviewService({ persistence });
+    const { session } = await host.createSession({ displayName: "Host" });
+
+    // Early tab re-reads persistence on getSession (same browser, later navigation).
+    expect(await earlyTab.getSession(session.id)).toMatchObject({ id: session.id });
+    const joined = await earlyTab.joinSession({
+      sessionId: session.id,
+      displayName: "Candidate",
+    });
+    expect(joined.displayName).toBe("Candidate");
+    expect(await host.listParticipants(session.id)).toHaveLength(2);
+  });
 });

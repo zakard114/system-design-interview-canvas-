@@ -19,9 +19,20 @@ export type ConnectionState = "connecting" | "live" | "error";
 
 const meKey = (sessionId: string) => `idc.me.${sessionId}`;
 
+/**
+ * Per-tab identity (sessionStorage), NOT localStorage.
+ * localStorage is shared across tabs — a join-link tab would steal the host's
+ * "me" and skip the name form, so the host never sees a second participant.
+ */
 export function readStoredParticipant(sessionId: string): Participant | null {
   try {
-    const raw = globalThis.localStorage?.getItem(meKey(sessionId));
+    // Drop legacy localStorage identity so a join-link tab cannot inherit the host.
+    try {
+      globalThis.localStorage?.removeItem(meKey(sessionId));
+    } catch {
+      /* ignore */
+    }
+    const raw = globalThis.sessionStorage?.getItem(meKey(sessionId));
     return raw ? (JSON.parse(raw) as Participant) : null;
   } catch {
     return null;
@@ -30,7 +41,7 @@ export function readStoredParticipant(sessionId: string): Participant | null {
 
 export function storeParticipant(participant: Participant) {
   try {
-    globalThis.localStorage?.setItem(
+    globalThis.sessionStorage?.setItem(
       meKey(participant.sessionId),
       JSON.stringify(participant),
     );
@@ -91,11 +102,19 @@ export function useInterviewSession(sessionId: string) {
     })();
 
     const unsubscribe = service.subscribe(sessionId, (event) => {
-      if (remoteSuppressedRef.current) return;
+      // Presence must update even while canvas remote events are suppressed.
+      if (event.type === "state_sync") {
+        setParticipants(event.participants);
+        if (!remoteSuppressedRef.current) {
+          setObjects(event.objects.map((o) => normalizeCanvasObject(o)));
+        }
+        return;
+      }
       if (event.type === "participants_updated") {
         setParticipants(event.participants);
         return;
       }
+      if (remoteSuppressedRef.current) return;
       if (event.type === "object_created") {
         const incoming = normalizeCanvasObject(event.object);
         setObjects((prev) => {
@@ -140,8 +159,27 @@ export function useInterviewSession(sessionId: string) {
       }
     });
 
+    // Presence fallback: poll so the host right-rail updates even if a
+    // BroadcastChannel / storage event is missed.
+    const poll = globalThis.setInterval(() => {
+      if (!active || !hydrated.current) return;
+      void service.listParticipants(sessionId).then((list) => {
+        if (!active) return;
+        setParticipants((prev) => {
+          if (
+            prev.length === list.length &&
+            prev.every((p, i) => p.id === list[i]?.id && p.displayName === list[i]?.displayName)
+          ) {
+            return prev;
+          }
+          return list;
+        });
+      });
+    }, 1500);
+
     return () => {
       active = false;
+      globalThis.clearInterval(poll);
       unsubscribe();
     };
   }, [service, sessionId]);

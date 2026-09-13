@@ -87,7 +87,14 @@ export type SessionEvent =
   | { type: "object_created"; sessionId: string; object: CanvasObject }
   | { type: "object_updated"; sessionId: string; object: CanvasObject }
   | { type: "object_deleted"; sessionId: string; objectId: string }
-  | { type: "participants_updated"; sessionId: string; participants: Participant[] };
+  | { type: "participants_updated"; sessionId: string; participants: Participant[] }
+  /** Full snapshot — used when another tab updates shared localStorage. */
+  | {
+      type: "state_sync";
+      sessionId: string;
+      participants: Participant[];
+      objects: CanvasObject[];
+    };
 
 export class SessionNotFoundError extends Error {
   constructor(id: string) {

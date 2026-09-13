@@ -24,7 +24,7 @@ export interface BroadcastPort {
   listen(handler: (message: unknown) => void): () => void;
 }
 
-const STORAGE_KEY = "idc.mock-store.v1";
+export const STORAGE_KEY = "idc.mock-store.v1";
 
 export function createLocalStoragePersistence(): PersistencePort {
   return {
@@ -63,4 +63,22 @@ export function createBroadcastChannelPort(name = "idc.session-events"): Broadca
       return () => channel.removeEventListener("message", onMessage);
     },
   };
+}
+
+/**
+ * Cross-tab fallback when BroadcastChannel is unavailable.
+ * Fires only in *other* tabs after localStorage.setItem.
+ */
+export function listenStorageKey(
+  key: string,
+  onChange: () => void,
+): () => void {
+  if (typeof window === "undefined" || typeof window.addEventListener !== "function") {
+    return () => {};
+  }
+  const handler = (event: StorageEvent) => {
+    if (event.key === key) onChange();
+  };
+  window.addEventListener("storage", handler);
+  return () => window.removeEventListener("storage", handler);
 }

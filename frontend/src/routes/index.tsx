@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, Boxes, PenLine, Radio, StickyNote } from "lucide-react";
-import { getInterviewService } from "@/services";
+import { getInterviewService, isUsingMockService } from "@/services";
 import { storeParticipant } from "@/hooks/useInterviewSession";
 import { parseSessionRef } from "@/lib/session-link";
 
@@ -30,6 +30,7 @@ function Home() {
   const [link, setLink] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const mockMode = isUsingMockService();
 
   const createSession = async () => {
     setError(null);
@@ -55,7 +56,23 @@ function Home() {
       return;
     }
     setError(null);
-    await navigate({ to: "/s/$sessionId", params: { sessionId } });
+    setBusy(true);
+    try {
+      const found = await getInterviewService().getSession(sessionId);
+      if (!found) {
+        setError(
+          mockMode
+            ? "Room not found in this browser. Demo mode keeps rooms in localStorage — open the link in another tab of the same browser where the room was created. A different browser cannot see that room yet."
+            : "Room not found. Check the link or ask the host to create the room again.",
+        );
+        return;
+      }
+      await navigate({ to: "/s/$sessionId", params: { sessionId } });
+    } catch {
+      setError("Could not open that room. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -108,7 +125,8 @@ function Home() {
             <button
               type="button"
               onClick={openLink}
-              className="mt-4 w-full rounded-md border border-input px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-accent"
+              disabled={busy}
+              className="mt-4 w-full rounded-md border border-input px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-accent disabled:opacity-60"
             >
               Open room
             </button>
@@ -132,9 +150,17 @@ function Home() {
           ))}
         </ul>
 
-        <p className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
-          <Radio className="size-3.5 text-primary" />
-          Demo mode: rooms live in your browser and sync across tabs — no server needed.
+        <p className="mt-8 flex items-start gap-2 text-xs text-muted-foreground">
+          <Radio className="mt-0.5 size-3.5 shrink-0 text-primary" />
+          {mockMode ? (
+            <span>
+              Demo mode: rooms live in this browser&apos;s localStorage and sync across
+              tabs. A join link in another browser (or private window) will not see the
+              room until a real backend is connected.
+            </span>
+          ) : (
+            <span>Connected to the API — rooms are shared across browsers.</span>
+          )}
         </p>
       </div>
     </main>

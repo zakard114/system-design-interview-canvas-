@@ -7,6 +7,8 @@ interface Props {
   selected: CanvasObject | null;
   selectedCount: number;
   participants: Participant[];
+  /** Current tab's participant id — used to mark "(you)" in the room list. */
+  meId?: string;
   onUpdate: (id: string, patch: Partial<CanvasObject>) => void;
   onDelete: (id: string) => void;
   onDeleteAll: () => void;
@@ -42,6 +44,7 @@ export function Inspector({
   selected,
   selectedCount,
   participants,
+  meId,
   onUpdate,
   onDelete,
   onDeleteAll,
@@ -169,21 +172,33 @@ export function Inspector({
 
       <div className="border-t border-border pt-3">
         <span className="mono-tag">In the room ({participants.length})</span>
-        <ul className="mt-2 space-y-1.5">
-          {participants.map((participant) => (
-            <li key={participant.id} className="flex items-center gap-2 text-sm">
-              <span
-                className="inline-block size-2 rounded-full"
-                style={{
-                  backgroundColor:
-                    participant.role === "interviewer" ? "var(--signal)" : "var(--note)",
-                }}
-              />
-              <span className="truncate">{participant.displayName}</span>
-              <span className="mono-tag ml-auto">{participant.role}</span>
-            </li>
-          ))}
-        </ul>
+        {participants.length === 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">Waiting for people to join…</p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {participants.map((participant) => {
+              const isYou = meId !== undefined && participant.id === meId;
+              return (
+                <li key={participant.id} className="flex items-center gap-2 text-sm">
+                  <span
+                    className="inline-block size-2 shrink-0 rounded-full"
+                    style={{
+                      backgroundColor:
+                        participant.role === "interviewer" ? "var(--signal)" : "var(--note)",
+                    }}
+                  />
+                  <span className="truncate font-medium">
+                    {participant.displayName}
+                    {isYou ? (
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">(you)</span>
+                    ) : null}
+                  </span>
+                  <span className="mono-tag ml-auto shrink-0">{participant.role}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );

@@ -10,9 +10,11 @@ import {
   type SessionEvent,
 } from "../types";
 import {
+  STORAGE_KEY,
   createBroadcastChannelPort,
   createLocalStoragePersistence,
   emptyStore,
+  listenStorageKey,
   type BroadcastPort,
   type PersistencePort,
   type StoreData,
@@ -49,6 +51,7 @@ export class MockInterviewService implements InterviewService {
   private now: () => Date;
   private listeners = new Map<string, Set<(event: SessionEvent) => void>>();
   private stopBroadcast?: () => void;
+  private stopStorage?: () => void;
 
   constructor(options: MockServiceOptions = {}) {
     this.persistence = options.persistence ?? null;
@@ -62,20 +65,48 @@ export class MockInterviewService implements InterviewService {
         const event = message as SessionEvent | undefined;
         if (!event || typeof event !== "object" || !("type" in event)) return;
         // Another tab mutated shared storage: re-read, then fan out locally.
-        this.data = this.persistence?.load() ?? this.data;
+        this.hydrate();
         this.emitLocal(event);
+      });
+    }
+
+    // localStorage "storage" events: same-browser tabs without BroadcastChannel.
+    if (this.persistence) {
+      this.stopStorage = listenStorageKey(STORAGE_KEY, () => {
+        this.hydrate();
+        this.emitStateSyncForListeners();
       });
     }
   }
 
   dispose() {
     this.stopBroadcast?.();
+    this.stopStorage?.();
     this.listeners.clear();
+  }
+
+  /** Re-read shared persistence so a tab opened earlier still sees rooms created later. */
+  private hydrate() {
+    const loaded = this.persistence?.load();
+    if (loaded) this.data = loaded;
+  }
+
+  private emitStateSyncForListeners() {
+    for (const sessionId of this.listeners.keys()) {
+      if (!this.data.sessions[sessionId]) continue;
+      this.emitLocal({
+        type: "state_sync",
+        sessionId,
+        participants: [...(this.data.participants[sessionId] ?? [])],
+        objects: [...(this.data.objects[sessionId] ?? [])],
+      });
+    }
   }
 
   // ---------- sessions ----------
 
   async createSession(input: { displayName?: string } = {}) {
+    this.hydrate();
     const session: Session = {
       id: this.newId(),
       joinCode: joinCode(),
@@ -99,6 +130,7 @@ export class MockInterviewService implements InterviewService {
   }
 
   async getSession(sessionId: string) {
+    this.hydrate();
     return this.data.sessions[sessionId] ?? null;
   }
 
@@ -107,6 +139,7 @@ export class MockInterviewService implements InterviewService {
     displayName: string;
     role?: ParticipantRole;
   }) {
+    this.hydrate();
     const session = this.requireSession(input.sessionId);
     const name = input.displayName.trim();
     if (!name) throw new Error("A display name is required");
@@ -130,6 +163,7 @@ export class MockInterviewService implements InterviewService {
   }
 
   async leaveSession(input: { sessionId: string; participantId: string }) {
+    this.hydrate();
     const list = this.data.participants[input.sessionId];
     if (!list) return;
     this.data.participants[input.sessionId] = list.filter(
@@ -144,6 +178,7 @@ export class MockInterviewService implements InterviewService {
   }
 
   async listParticipants(sessionId: string) {
+    this.hydrate();
     this.requireSession(sessionId);
     return [...(this.data.participants[sessionId] ?? [])];
   }
@@ -151,6 +186,7 @@ export class MockInterviewService implements InterviewService {
   // ---------- canvas objects ----------
 
   async listObjects(sessionId: string) {
+    this.hydrate();
     this.requireSession(sessionId);
     return [...(this.data.objects[sessionId] ?? [])];
   }
@@ -215,6 +251,7 @@ export class MockInterviewService implements InterviewService {
   }
 
   private requireSession(sessionId: string) {
+    this.hydrate();
     const session = this.data.sessions[sessionId];
     if (!session) throw new SessionNotFoundError(sessionId);
     return session;
