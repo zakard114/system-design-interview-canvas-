@@ -51,6 +51,10 @@ export interface EdgeObject extends BaseObject {
   from: string;
   to: string;
   label: string;
+  lineStyle?: StrokeLineStyle;
+  pathStyle?: "straight" | "curved";
+  fromAnchor?: { u: number; v: number };
+  toAnchor?: { u: number; v: number };
 }
 
 export interface StickyObject extends BaseObject {
@@ -60,11 +64,15 @@ export interface StickyObject extends BaseObject {
   text: string;
 }
 
+export type StrokeLineStyle = "solid" | "dashed" | "dotted";
+
 export interface StrokeObject extends BaseObject {
   kind: "stroke";
   points: Array<[number, number]>;
   color: string;
   width: number;
+  /** Missing / undefined → solid (normalized on read). */
+  lineStyle?: StrokeLineStyle;
 }
 
 export type CanvasObject = NodeObject | EdgeObject | StickyObject | StrokeObject;

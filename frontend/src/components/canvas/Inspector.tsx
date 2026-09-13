@@ -1,20 +1,78 @@
+import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { CanvasObject, Participant } from "@/services";
 import { nodeMeta } from "./node-meta";
 
 interface Props {
   selected: CanvasObject | null;
+  selectedCount: number;
   participants: Participant[];
   onUpdate: (id: string, patch: Partial<CanvasObject>) => void;
   onDelete: (id: string) => void;
+  onDeleteAll: () => void;
+  /** Optional fixed width (px) for lg+ layout; full width when stacked. */
+  widthPx?: number | undefined;
+  /** Optional fixed height (px) for stacked (narrow) layout. */
+  heightPx?: number | undefined;
 }
 
-export function Inspector({ selected, participants, onUpdate, onDelete }: Props) {
+/** Keep caret stable while PATCH/WS echoes rewrite `selected` under us. */
+function useFocusedDraft(synced: string, objectId: string) {
+  const [draft, setDraft] = useState(synced);
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) setDraft(synced);
+  }, [objectId, synced]);
+
+  return {
+    value: draft,
+    onFocus: () => {
+      focused.current = true;
+    },
+    onBlur: () => {
+      focused.current = false;
+      setDraft(synced);
+    },
+    onChange: (next: string) => setDraft(next),
+  };
+}
+
+export function Inspector({
+  selected,
+  selectedCount,
+  participants,
+  onUpdate,
+  onDelete,
+  onDeleteAll,
+  widthPx,
+  heightPx,
+}: Props) {
   return (
-    <div className="panel flex w-full flex-col gap-4 p-3 lg:w-64">
+    <div
+      className="panel flex w-full flex-col gap-4 overflow-y-auto p-3 lg:w-auto lg:shrink-0"
+      style={{
+        ...(widthPx != null ? { width: widthPx } : {}),
+        ...(heightPx != null ? { height: heightPx, flexShrink: 0 } : {}),
+      }}
+      data-testid="inspector-panel"
+    >
       <div>
         <span className="mono-tag">Selection</span>
-        {!selected ? (
+        {selectedCount > 1 ? (
+          <div className="mt-2 space-y-3">
+            <p className="text-sm font-medium text-foreground">
+              {selectedCount} selected
+            </p>
+            <button
+              type="button"
+              onClick={onDeleteAll}
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-destructive/50 px-2 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+            >
+              <Trash2 className="size-3.5" /> Delete all
+            </button>
+          </div>
+        ) : !selected ? (
           <p className="mt-2 text-xs text-muted-foreground">
             Pick a tool, click the board to place things. Select an object to rename or
             delete it.
@@ -32,38 +90,70 @@ export function Inspector({ selected, participants, onUpdate, onDelete }: Props)
             </p>
 
             {selected.kind === "node" ? (
-              <label className="block space-y-1">
-                <span className="mono-tag">Label</span>
-                <input
-                  value={selected.label}
-                  onChange={(event) => onUpdate(selected.id, { label: event.target.value })}
-                  className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring"
-                />
-              </label>
+              <LabelField
+                objectId={selected.id}
+                label={selected.label}
+                onUpdate={onUpdate}
+              />
             ) : null}
 
             {selected.kind === "edge" ? (
-              <label className="block space-y-1">
-                <span className="mono-tag">Arrow label</span>
-                <input
-                  value={selected.label}
+              <>
+                <LabelField
+                  objectId={selected.id}
+                  label={selected.label}
                   placeholder="e.g. writes"
-                  onChange={(event) => onUpdate(selected.id, { label: event.target.value })}
-                  className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring"
+                  fieldLabel="Arrow label"
+                  onUpdate={onUpdate}
                 />
-              </label>
+                <label className="block space-y-1">
+                  <span className="mono-tag">Line style</span>
+                  <select
+                    value={
+                      (selected.pathStyle ?? "straight") === "curved"
+                        ? "curved"
+                        : (selected.lineStyle ?? "solid")
+                    }
+                    onChange={(event) => {
+                      const v = event.target.value;
+                      if (v === "curved") {
+                        onUpdate(selected.id, {
+                          pathStyle: "curved",
+                          lineStyle: "solid",
+                        });
+                      } else {
+                        onUpdate(selected.id, {
+                          pathStyle: "straight",
+                          lineStyle: v as "solid" | "dashed" | "dotted",
+                        });
+                      }
+                    }}
+                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring"
+                  >
+                    <option value="solid">Solid</option>
+                    <option value="dashed">Dashed</option>
+                    <option value="dotted">Dotted</option>
+                    <option value="curved">Curved</option>
+                  </select>
+                </label>
+              </>
             ) : null}
 
             {selected.kind === "sticky" ? (
-              <label className="block space-y-1">
-                <span className="mono-tag">Text</span>
-                <textarea
-                  value={selected.text}
-                  rows={4}
-                  onChange={(event) => onUpdate(selected.id, { text: event.target.value })}
-                  className="w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring"
-                />
-              </label>
+              <StickyField
+                objectId={selected.id}
+                text={selected.text}
+                onUpdate={onUpdate}
+              />
+            ) : null}
+
+            {selected.kind === "stroke" ? (
+              <StrokeFields
+                objectId={selected.id}
+                width={selected.width}
+                lineStyle={selected.lineStyle ?? "solid"}
+                onUpdate={onUpdate}
+              />
             ) : null}
 
             <button
@@ -95,6 +185,118 @@ export function Inspector({ selected, participants, onUpdate, onDelete }: Props)
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+function LabelField({
+  objectId,
+  label,
+  onUpdate,
+  placeholder,
+  fieldLabel = "Label",
+}: {
+  objectId: string;
+  label: string;
+  onUpdate: (id: string, patch: Partial<CanvasObject>) => void;
+  placeholder?: string;
+  fieldLabel?: string;
+}) {
+  const draft = useFocusedDraft(label, objectId);
+  return (
+    <label className="block space-y-1">
+      <span className="mono-tag">{fieldLabel}</span>
+      <input
+        value={draft.value}
+        placeholder={placeholder}
+        onFocus={draft.onFocus}
+        onBlur={draft.onBlur}
+        onChange={(event) => {
+          draft.onChange(event.target.value);
+          onUpdate(objectId, { label: event.target.value });
+        }}
+        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring"
+      />
+    </label>
+  );
+}
+
+function StickyField({
+  objectId,
+  text,
+  onUpdate,
+}: {
+  objectId: string;
+  text: string;
+  onUpdate: (id: string, patch: Partial<CanvasObject>) => void;
+}) {
+  const draft = useFocusedDraft(text, objectId);
+  return (
+    <label className="block space-y-1">
+      <span className="mono-tag">Text</span>
+      <textarea
+        value={draft.value}
+        rows={4}
+        onFocus={draft.onFocus}
+        onBlur={draft.onBlur}
+        onChange={(event) => {
+          draft.onChange(event.target.value);
+          onUpdate(objectId, { text: event.target.value });
+        }}
+        className="w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring"
+      />
+    </label>
+  );
+}
+
+function StrokeFields({
+  objectId,
+  width,
+  lineStyle,
+  onUpdate,
+}: {
+  objectId: string;
+  width: number;
+  lineStyle: "solid" | "dashed" | "dotted";
+  onUpdate: (id: string, patch: Partial<CanvasObject>) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <label className="block space-y-1">
+        <span className="mono-tag">Line style</span>
+        <select
+          value={lineStyle}
+          onChange={(event) =>
+            onUpdate(objectId, {
+              lineStyle: event.target.value as "solid" | "dashed" | "dotted",
+            })
+          }
+          className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring"
+        >
+          <option value="solid">Solid</option>
+          <option value="dashed">Dashed</option>
+          <option value="dotted">Dotted</option>
+        </select>
+      </label>
+      <label className="block space-y-1">
+        <span className="mono-tag">Width</span>
+        <select
+          value={String(width)}
+          onChange={(event) =>
+            onUpdate(objectId, { width: Number(event.target.value) })
+          }
+          className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring"
+        >
+          {[2, 4, 8, 12].map((n) => (
+            <option key={n} value={n}>
+              {n}px
+            </option>
+          ))}
+          {![2, 2.5, 4, 8].includes(width) ? (
+            <option value={width}>{width}px</option>
+          ) : null}
+        </select>
+      </label>
     </div>
   );
 }

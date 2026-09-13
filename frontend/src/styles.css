@@ -80,8 +80,10 @@
   --grid: oklch(0.28 0.026 258);
   --signal: oklch(0.78 0.13 195);
   --signal-foreground: oklch(0.19 0.03 240);
-  --note: oklch(0.86 0.14 92);
-  --note-foreground: oklch(0.28 0.06 70);
+  /* Muted warm gray-tan — low chroma, easier on the eyes than pastel yellow. */
+  /* Dark ivory — low chroma, easy on the eyes (not reddish yellow). */
+  --note: oklch(0.66 0.012 95);
+  --note-foreground: oklch(0.28 0.01 90);
   --ink: oklch(0.88 0.02 250);
   --node-service: oklch(0.78 0.13 195);
   --node-database: oklch(0.74 0.15 150);

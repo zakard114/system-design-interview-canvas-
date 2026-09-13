@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getInterviewService,
+  ObjectNotFoundError,
   type CanvasObject,
+  type EdgeObject,
   type NewCanvasObject,
   type Participant,
   type ParticipantRole,
   type Session,
 } from "@/services";
+import {
+  mergeEdgeEndpoints,
+  normalizeCanvasObject,
+} from "@/services/normalize-canvas-object";
+import { shouldApplyRemoteObjectUpdate } from "./remote-object-update";
 
 export type ConnectionState = "connecting" | "live" | "error";
 
@@ -32,6 +39,10 @@ export function storeParticipant(participant: Participant) {
   }
 }
 
+function isLocalId(id: string) {
+  return id.startsWith("local-");
+}
+
 export function useInterviewSession(sessionId: string) {
   const service = useMemo(() => getInterviewService(), []);
   const [session, setSession] = useState<Session | null>(null);
@@ -41,6 +52,11 @@ export function useInterviewSession(sessionId: string) {
   const [status, setStatus] = useState<ConnectionState>("connecting");
   const [notFound, setNotFound] = useState(false);
   const hydrated = useRef(false);
+  /** objectId → latest local update sequence still in flight */
+  const pendingLocalUpdates = useRef(new Map<string, number>());
+  /** Serialize PATCHes per object so WS echoes cannot land out of order. */
+  const updateChains = useRef(new Map<string, Promise<void>>());
+  const remoteSuppressedRef = useRef(false);
 
   // Initial load + realtime subscription.
   useEffect(() => {
@@ -75,29 +91,53 @@ export function useInterviewSession(sessionId: string) {
     })();
 
     const unsubscribe = service.subscribe(sessionId, (event) => {
+      if (remoteSuppressedRef.current) return;
       if (event.type === "participants_updated") {
         setParticipants(event.participants);
         return;
       }
       if (event.type === "object_created") {
-        setObjects((prev) =>
-          prev.some((o) => o.id === event.object.id) ? prev : [...prev, event.object],
-        );
+        const incoming = normalizeCanvasObject(event.object);
+        setObjects((prev) => {
+          if (prev.some((o) => o.id === incoming.id)) return prev;
+          // Replace matching optimistic edge so we don't briefly keep two copies
+          // then drop the wrong one.
+          let next = prev;
+          if (incoming.kind === "edge") {
+            const edge = incoming as EdgeObject;
+            next = prev.filter(
+              (o) =>
+                !(
+                  o.kind === "edge" &&
+                  isLocalId(o.id) &&
+                  o.from === edge.from &&
+                  o.to === edge.to
+                ),
+            );
+          }
+          return [...next, incoming];
+        });
         return;
       }
       if (event.type === "object_updated") {
+        if (!shouldApplyRemoteObjectUpdate(event.object.id, pendingLocalUpdates.current)) {
+          return;
+        }
+        const incoming = normalizeCanvasObject(event.object);
         setObjects((prev) =>
-          prev.map((o) => (o.id === event.object.id ? event.object : o)),
+          prev.map((o) => (o.id === incoming.id ? incoming : o)),
         );
         return;
       }
-      setObjects((prev) =>
-        prev.filter(
-          (o) =>
-            o.id !== event.objectId &&
-            !(o.kind === "edge" && (o.from === event.objectId || o.to === event.objectId)),
-        ),
-      );
+      if (event.type === "object_deleted") {
+        setObjects((prev) =>
+          prev.filter(
+            (o) =>
+              o.id !== event.objectId &&
+              !(o.kind === "edge" && (o.from === event.objectId || o.to === event.objectId)),
+          ),
+        );
+      }
     });
 
     return () => {
@@ -119,22 +159,83 @@ export function useInterviewSession(sessionId: string) {
 
   const createObject = useCallback(
     async (object: NewCanvasObject) => {
+      const optimisticId = `local-${crypto.randomUUID().replace(/-/g, "")}`;
+      const optimistic = { ...object, id: optimisticId } as CanvasObject;
+      setObjects((prev) => [...prev, optimistic]);
+      try {
+        const createdRaw = await service.createObject(sessionId, object);
+        const created = mergeEdgeEndpoints(
+          normalizeCanvasObject(createdRaw),
+          optimistic,
+        );
+        setObjects((prev) => {
+          let next = prev.filter((o) => o.id !== optimisticId);
+          if (created.kind === "edge") {
+            const edge = created as EdgeObject;
+            next = next.filter(
+              (o) =>
+                !(
+                  o.kind === "edge" &&
+                  isLocalId(o.id) &&
+                  o.from === edge.from &&
+                  o.to === edge.to
+                ),
+            );
+          }
+          const idx = next.findIndex((o) => o.id === created.id);
+          if (idx >= 0) {
+            const copy = [...next];
+            copy[idx] = mergeEdgeEndpoints(created, next[idx]);
+            return copy;
+          }
+          return [...next, created];
+        });
+        return created;
+      } catch (err) {
+        setObjects((prev) => prev.filter((o) => o.id !== optimisticId));
+        console.error("createObject failed", object, err);
+        throw err;
+      }
+    },
+    [service, sessionId],
+  );
+
+  const createObjectRemote = useCallback(
+    async (object: NewCanvasObject) => {
       const created = await service.createObject(sessionId, object);
-      setObjects((prev) =>
-        prev.some((o) => o.id === created.id) ? prev : [...prev, created],
-      );
-      return created;
+      return normalizeCanvasObject(created);
     },
     [service, sessionId],
   );
 
   const updateObject = useCallback(
     async (objectId: string, patch: Partial<CanvasObject>) => {
-      // Optimistic: canvas dragging must feel immediate.
+      const seq = (pendingLocalUpdates.current.get(objectId) ?? 0) + 1;
+      pendingLocalUpdates.current.set(objectId, seq);
       setObjects((prev) =>
         prev.map((o) => (o.id === objectId ? ({ ...o, ...patch } as CanvasObject) : o)),
       );
-      await service.updateObject(sessionId, objectId, patch);
+
+      const previous = updateChains.current.get(objectId) ?? Promise.resolve();
+      const next = previous
+        .catch(() => {
+          /* keep the chain alive after a failed PATCH */
+        })
+        .then(async () => {
+          await service.updateObject(sessionId, objectId, patch);
+        })
+        .finally(() => {
+          if (pendingLocalUpdates.current.get(objectId) === seq) {
+            pendingLocalUpdates.current.delete(objectId);
+          }
+        });
+      updateChains.current.set(
+        objectId,
+        next.catch(() => {
+          /* swallowed for chain continuity */
+        }),
+      );
+      await next;
     },
     [service, sessionId],
   );
@@ -148,10 +249,56 @@ export function useInterviewSession(sessionId: string) {
             !(o.kind === "edge" && (o.from === objectId || o.to === objectId)),
         ),
       );
-      await service.deleteObject(sessionId, objectId);
+      try {
+        await service.deleteObject(sessionId, objectId);
+      } catch (err) {
+        if (!(err instanceof ObjectNotFoundError)) throw err;
+      }
     },
     [service, sessionId],
   );
+
+  const deleteObjects = useCallback(
+    async (objectIds: string[]) => {
+      if (objectIds.length === 0) return;
+      const idSet = new Set(objectIds);
+      setObjects((prev) => {
+        for (const o of prev) {
+          if (o.kind === "edge" && (idSet.has(o.from) || idSet.has(o.to))) {
+            idSet.add(o.id);
+          }
+        }
+        return prev.filter((o) => !idSet.has(o.id));
+      });
+      await Promise.all(
+        [...idSet].map((id) =>
+          service.deleteObject(sessionId, id).catch((err) => {
+            if (!(err instanceof ObjectNotFoundError)) throw err;
+          }),
+        ),
+      );
+    },
+    [service, sessionId],
+  );
+
+  const deleteObjectRemote = useCallback(
+    async (objectId: string) => {
+      try {
+        await service.deleteObject(sessionId, objectId);
+      } catch (err) {
+        if (!(err instanceof ObjectNotFoundError)) throw err;
+      }
+    },
+    [service, sessionId],
+  );
+
+  const replaceObjects = useCallback((next: CanvasObject[]) => {
+    setObjects(next);
+  }, []);
+
+  const setRemoteSuppressed = useCallback((suppressed: boolean) => {
+    remoteSuppressedRef.current = suppressed;
+  }, []);
 
   return {
     session,
@@ -162,7 +309,12 @@ export function useInterviewSession(sessionId: string) {
     notFound,
     join,
     createObject,
+    createObjectRemote,
     updateObject,
     deleteObject,
+    deleteObjects,
+    deleteObjectRemote,
+    replaceObjects,
+    setRemoteSuppressed,
   };
 }

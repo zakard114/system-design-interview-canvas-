@@ -1,0 +1,787 @@
+openapi: 3.1.0
+info:
+  title: System Design Interview Canvas API
+  version: 0.1.0
+  description: |
+    HTTP + WebSocket contract for System Design Interview Canvas.
+
+    Field naming is **camelCase** to match the frontend service types
+    (`joinCode`, `displayName`, `createdAt`, `sessionId`, `createdBy`, etc.).
+
+    REST paths map 1:1 to `InterviewService` methods in
+    `frontend/src/services/types.ts`. Realtime fan-out uses WebSocket
+    `GET /api/sessions/{sessionId}/ws` (documented via `x-websocket`);
+    server → client messages are `SessionEvent` only. No client→server
+    command protocol beyond subscribe/connect for fan-out.
+
+    Out of scope for this contract: `/api/projects`, `/api/canvases`, `/api/ai/*`.
+servers:
+  - url: http://localhost:8000
+    description: Local FastAPI (default)
+
+tags:
+  - name: sessions
+    description: Session lifecycle (`createSession`, `getSession`)
+  - name: participants
+    description: Join / leave / list (`joinSession`, `leaveSession`, `listParticipants`)
+  - name: objects
+    description: Canvas CRUD (`listObjects`, `createObject`, `updateObject`, `deleteObject`)
+  - name: realtime
+    description: WebSocket subscribe fan-out (`subscribe`)
+
+paths:
+  /api/sessions:
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a new interview session
+      description: |
+        Maps to `InterviewService.createSession`.
+        Optional `displayName` may auto-join the creator as a participant;
+        when omitted, `participant` in the response is `null`.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/sessions/{sessionId}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get session by id
+      description: |
+        Maps to `InterviewService.getSession`.
+        Returns 404 when the session does not exist (FE mock returns `null`).
+      responses:
+        "200":
+          description: Session found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+  /api/sessions/{sessionId}/join:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      operationId: joinSession
+      tags: [participants]
+      summary: Join a session
+      description: |
+        Maps to `InterviewService.joinSession`.
+        `displayName` is required; `role` defaults to `candidate` when omitted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinSessionRequest"
+      responses:
+        "200":
+          description: Joined; returns the new participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Participant"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+  /api/sessions/{sessionId}/leave:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    post:
+      operationId: leaveSession
+      tags: [participants]
+      summary: Leave a session
+      description: |
+        Maps to `InterviewService.leaveSession`.
+        Request body **must** include `participantId`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaveSessionRequest"
+      responses:
+        "204":
+          description: Left successfully (no body)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+  /api/sessions/{sessionId}/participants:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      operationId: listParticipants
+      tags: [participants]
+      summary: List participants in a session
+      description: Maps to `InterviewService.listParticipants`.
+      responses:
+        "200":
+          description: Participant list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Participant"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+  /api/sessions/{sessionId}/objects:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      operationId: listObjects
+      tags: [objects]
+      summary: List canvas objects
+      description: Maps to `InterviewService.listObjects`.
+      responses:
+        "200":
+          description: Canvas objects in the session
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CanvasObject"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+    post:
+      operationId: createObject
+      tags: [objects]
+      summary: Create a canvas object
+      description: |
+        Maps to `InterviewService.createObject`.
+        Body is `NewCanvasObject` (same shape as `CanvasObject` without server-assigned `id`).
+        Successful create should fan out `object_created` on the session WebSocket.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewCanvasObject"
+      responses:
+        "201":
+          description: Object created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanvasObject"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+  /api/sessions/{sessionId}/objects/{objectId}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+      - $ref: "#/components/parameters/ObjectId"
+    patch:
+      operationId: updateObject
+      tags: [objects]
+      summary: Partially update a canvas object
+      description: |
+        Maps to `InterviewService.updateObject`.
+        Body is a partial object patch; `kind` must not change identity of the variant.
+        Successful update should fan out `object_updated`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CanvasObjectPatch"
+      responses:
+        "200":
+          description: Updated object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CanvasObject"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Session or object not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                sessionNotFound:
+                  value:
+                    error: SessionNotFoundError
+                    message: 'Session "abc" was not found'
+                objectNotFound:
+                  value:
+                    error: ObjectNotFoundError
+                    message: 'Object "xyz" was not found'
+    delete:
+      operationId: deleteObject
+      tags: [objects]
+      summary: Delete a canvas object
+      description: |
+        Maps to `InterviewService.deleteObject`.
+        Successful delete should fan out `object_deleted`.
+      responses:
+        "204":
+          description: Deleted (no body)
+        "404":
+          description: Session or object not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sessions/{sessionId}/ws:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      operationId: subscribeSession
+      tags: [realtime]
+      summary: WebSocket — session event fan-out
+      description: |
+        Maps to `InterviewService.subscribe`.
+
+        Upgrade this HTTP GET to a WebSocket connection on the same path.
+        Server fans out `SessionEvent` JSON messages to all subscribers of the room.
+        Client→server protocol is intentionally minimal: connect/subscribe only;
+        canvas mutations go through REST. No additional client command schema
+        is defined beyond what is needed for subscribe fan-out.
+
+        Typical server → client message types:
+        - `object_created`
+        - `object_updated`
+        - `object_deleted`
+        - `participants_updated`
+      x-websocket:
+        protocol: websocket
+        messages:
+          serverToClient:
+            schema:
+              $ref: "#/components/schemas/SessionEvent"
+          clientToServer:
+            description: >
+              Not specified beyond keep-alive/connect for fan-out subscribe.
+              Do not invent a command protocol in v0.1.0.
+      responses:
+        "101":
+          description: Switching Protocols — WebSocket established
+        "404":
+          $ref: "#/components/responses/SessionNotFound"
+
+components:
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: Session id (camelCase path param name matches FE `sessionId`)
+      schema:
+        type: string
+    ObjectId:
+      name: objectId
+      in: path
+      required: true
+      description: Canvas object id
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    SessionNotFound:
+      description: Session not found (`SessionNotFoundError`)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: SessionNotFoundError
+            message: 'Session "abc" was not found'
+
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Machine-readable error name (e.g. SessionNotFoundError)
+          examples:
+            - SessionNotFoundError
+            - ObjectNotFoundError
+            - ValidationError
+        message:
+          type: string
+          description: Human-readable detail
+
+    NodeType:
+      type: string
+      enum:
+        - service
+        - database
+        - queue
+        - cache
+        - loadbalancer
+        - llm
+
+    ParticipantRole:
+      type: string
+      enum:
+        - interviewer
+        - candidate
+
+    Session:
+      type: object
+      required: [id, joinCode, createdAt, status]
+      properties:
+        id:
+          type: string
+        joinCode:
+          type: string
+          description: Short code used in shareable join links
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [open, closed]
+
+    Participant:
+      type: object
+      required: [id, sessionId, displayName, role, joinedAt]
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        displayName:
+          type: string
+        role:
+          $ref: "#/components/schemas/ParticipantRole"
+        joinedAt:
+          type: string
+          format: date-time
+
+    CreateSessionRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          description: >
+            If provided, creator is joined as a participant (typically interviewer).
+            If omitted, response `participant` is null.
+      additionalProperties: false
+
+    CreateSessionResponse:
+      type: object
+      required: [session, participant]
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+        participant:
+          oneOf:
+            - $ref: "#/components/schemas/Participant"
+            - type: "null"
+          description: Null when create was called without displayName
+
+    JoinSessionRequest:
+      type: object
+      required: [displayName]
+      properties:
+        displayName:
+          type: string
+        role:
+          $ref: "#/components/schemas/ParticipantRole"
+          description: Defaults to candidate when omitted
+      additionalProperties: false
+
+    LeaveSessionRequest:
+      type: object
+      required: [participantId]
+      properties:
+        participantId:
+          type: string
+      additionalProperties: false
+
+    Point:
+      type: array
+      minItems: 2
+      maxItems: 2
+      items:
+        type: number
+      description: "[x, y] coordinate pair"
+      examples:
+        - [120.5, 80]
+
+    AnchorUV:
+      type: object
+      required: [u, v]
+      properties:
+        u:
+          type: number
+          minimum: 0
+          maximum: 1
+        v:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    NodeObject:
+      type: object
+      required: [id, createdBy, kind, type, x, y, w, h, label]
+      properties:
+        id:
+          type: string
+        createdBy:
+          type: string
+          description: Participant id of the creator
+        kind:
+          type: string
+          const: node
+        type:
+          $ref: "#/components/schemas/NodeType"
+        x:
+          type: number
+        y:
+          type: number
+        w:
+          type: number
+        h:
+          type: number
+        label:
+          type: string
+
+    EdgeObject:
+      type: object
+      required: [id, createdBy, kind, from, to]
+      properties:
+        id:
+          type: string
+        createdBy:
+          type: string
+        kind:
+          type: string
+          const: edge
+        from:
+          type: string
+          description: Source node object id
+        to:
+          type: string
+          description: Target node object id
+        label:
+          type: string
+          default: ""
+        lineStyle:
+          type: string
+          enum: [solid, dashed, dotted]
+          default: solid
+        pathStyle:
+          type: string
+          enum: [straight, curved]
+          default: straight
+        fromAnchor:
+          $ref: "#/components/schemas/AnchorUV"
+        toAnchor:
+          $ref: "#/components/schemas/AnchorUV"
+
+    StickyObject:
+      type: object
+      required: [id, createdBy, kind, x, y, text]
+      properties:
+        id:
+          type: string
+        createdBy:
+          type: string
+        kind:
+          type: string
+          const: sticky
+        x:
+          type: number
+        y:
+          type: number
+        text:
+          type: string
+
+    StrokeObject:
+      type: object
+      required: [id, createdBy, kind, points, color, width]
+      properties:
+        id:
+          type: string
+        createdBy:
+          type: string
+        kind:
+          type: string
+          const: stroke
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/Point"
+        color:
+          type: string
+        width:
+          type: number
+        lineStyle:
+          type: string
+          enum: [solid, dashed, dotted]
+          default: solid
+
+    CanvasObject:
+      oneOf:
+        - $ref: "#/components/schemas/NodeObject"
+        - $ref: "#/components/schemas/EdgeObject"
+        - $ref: "#/components/schemas/StickyObject"
+        - $ref: "#/components/schemas/StrokeObject"
+      discriminator:
+        propertyName: kind
+        mapping:
+          node: "#/components/schemas/NodeObject"
+          edge: "#/components/schemas/EdgeObject"
+          sticky: "#/components/schemas/StickyObject"
+          stroke: "#/components/schemas/StrokeObject"
+
+    NewNodeObject:
+      type: object
+      required: [createdBy, kind, type, x, y, w, h, label]
+      properties:
+        createdBy:
+          type: string
+        kind:
+          type: string
+          const: node
+        type:
+          $ref: "#/components/schemas/NodeType"
+        x:
+          type: number
+        y:
+          type: number
+        w:
+          type: number
+        h:
+          type: number
+        label:
+          type: string
+
+    NewEdgeObject:
+      type: object
+      required: [createdBy, kind, from, to]
+      properties:
+        createdBy:
+          type: string
+        kind:
+          type: string
+          const: edge
+        from:
+          type: string
+        to:
+          type: string
+        label:
+          type: string
+          default: ""
+        lineStyle:
+          type: string
+          enum: [solid, dashed, dotted]
+          default: solid
+        pathStyle:
+          type: string
+          enum: [straight, curved]
+          default: straight
+        fromAnchor:
+          $ref: "#/components/schemas/AnchorUV"
+        toAnchor:
+          $ref: "#/components/schemas/AnchorUV"
+
+    NewStickyObject:
+      type: object
+      required: [createdBy, kind, x, y, text]
+      properties:
+        createdBy:
+          type: string
+        kind:
+          type: string
+          const: sticky
+        x:
+          type: number
+        y:
+          type: number
+        text:
+          type: string
+
+    NewStrokeObject:
+      type: object
+      required: [createdBy, kind, points, color, width]
+      properties:
+        createdBy:
+          type: string
+        kind:
+          type: string
+          const: stroke
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/Point"
+        color:
+          type: string
+        width:
+          type: number
+        lineStyle:
+          type: string
+          enum: [solid, dashed, dotted]
+          default: solid
+
+    NewCanvasObject:
+      oneOf:
+        - $ref: "#/components/schemas/NewNodeObject"
+        - $ref: "#/components/schemas/NewEdgeObject"
+        - $ref: "#/components/schemas/NewStickyObject"
+        - $ref: "#/components/schemas/NewStrokeObject"
+      discriminator:
+        propertyName: kind
+        mapping:
+          node: "#/components/schemas/NewNodeObject"
+          edge: "#/components/schemas/NewEdgeObject"
+          sticky: "#/components/schemas/NewStickyObject"
+          stroke: "#/components/schemas/NewStrokeObject"
+      description: |
+        Same as CanvasObject without server-assigned `id`
+        (`Omit<…, "id">` in FE types).
+
+    CanvasObjectPatch:
+      type: object
+      description: |
+        Partial patch for `updateObject`. Fields are optional; do not change
+        `kind` in a way that switches the variant. `id` is taken from the path.
+      properties:
+        createdBy:
+          type: string
+        kind:
+          type: string
+          enum: [node, edge, sticky, stroke]
+        type:
+          $ref: "#/components/schemas/NodeType"
+        x:
+          type: number
+        y:
+          type: number
+        w:
+          type: number
+        h:
+          type: number
+        label:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        text:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/Point"
+        color:
+          type: string
+        width:
+          type: number
+        lineStyle:
+          type: string
+          enum: [solid, dashed, dotted]
+        pathStyle:
+          type: string
+          enum: [straight, curved]
+        fromAnchor:
+          $ref: "#/components/schemas/AnchorUV"
+        toAnchor:
+          $ref: "#/components/schemas/AnchorUV"
+      additionalProperties: false
+
+    ObjectCreatedEvent:
+      type: object
+      required: [type, sessionId, object]
+      properties:
+        type:
+          type: string
+          const: object_created
+        sessionId:
+          type: string
+        object:
+          $ref: "#/components/schemas/CanvasObject"
+
+    ObjectUpdatedEvent:
+      type: object
+      required: [type, sessionId, object]
+      properties:
+        type:
+          type: string
+          const: object_updated
+        sessionId:
+          type: string
+        object:
+          $ref: "#/components/schemas/CanvasObject"
+
+    ObjectDeletedEvent:
+      type: object
+      required: [type, sessionId, objectId]
+      properties:
+        type:
+          type: string
+          const: object_deleted
+        sessionId:
+          type: string
+        objectId:
+          type: string
+
+    ParticipantsUpdatedEvent:
+      type: object
+      required: [type, sessionId, participants]
+      properties:
+        type:
+          type: string
+          const: participants_updated
+        sessionId:
+          type: string
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/Participant"
+
+    SessionEvent:
+      oneOf:
+        - $ref: "#/components/schemas/ObjectCreatedEvent"
+        - $ref: "#/components/schemas/ObjectUpdatedEvent"
+        - $ref: "#/components/schemas/ObjectDeletedEvent"
+        - $ref: "#/components/schemas/ParticipantsUpdatedEvent"
+      discriminator:
+        propertyName: type
+        mapping:
+          object_created: "#/components/schemas/ObjectCreatedEvent"
+          object_updated: "#/components/schemas/ObjectUpdatedEvent"
+          object_deleted: "#/components/schemas/ObjectDeletedEvent"
+          participants_updated: "#/components/schemas/ParticipantsUpdatedEvent"
+      description: |
+        Room-scoped fan-out payload for WebSocket subscribers
+        (`InterviewService.subscribe` listener argument).
