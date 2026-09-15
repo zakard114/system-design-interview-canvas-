@@ -23,6 +23,10 @@ export interface HttpInterviewServiceOptions {
 }
 
 function toWsUrl(httpBase: string, path: string): string {
+  if (!httpBase) {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${window.location.host}${path}`;
+  }
   const base = httpBase.replace(/\/$/, "");
   const wsBase = base.replace(/^http/i, "ws");
   return `${wsBase}${path}`;

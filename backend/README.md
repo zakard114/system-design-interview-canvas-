@@ -25,6 +25,22 @@ uv run uvicorn interview_canvas_backend.main:app --reload --port 8000
 
 CORS allows `http://localhost:8080`. Frontend mock remains available via `VITE_USE_MOCK=true`.
 
+## Docker (Module 03 — single container)
+
+From the repository root (Docker Desktop running):
+
+```powershell
+. E:\IT_SPACES\AI\scripts\use_e_drive.ps1
+cd E:\IT_SPACES\AI\ZoomCamp\AIDT\02\Development\system-design-interview-canvas
+docker build -t sdip:latest .
+docker run --rm -p 8000:8000 `
+  -v sdip-data:/data `
+  -e DATABASE_URL=sqlite:////data/app.db `
+  --name sdip sdip:latest
+```
+
+Open http://localhost:8000 (UI + API on one port). Set `INTERVIEW_CANVAS_STATIC_DIR` in the image to serve the built SPA from `dist/client`.
+
 ## Tests
 
 ```powershell

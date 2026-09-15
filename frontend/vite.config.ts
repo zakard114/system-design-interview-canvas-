@@ -7,6 +7,8 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  // Production image: FastAPI serves a prerendered SPA shell (no Nitro worker).
+  nitro: false,
   // Slow disks / cold Windows transforms can exceed Vite's 60s SSR transport timeout
   // and then cache the failure — clear node_modules/.vite and restart if it happens.
   vite: {
@@ -23,5 +25,9 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    spa: {
+      enabled: true,
+      prerender: { outputPath: "index.html" },
+    },
   },
 });

@@ -24,9 +24,12 @@ function resolveDefaultService(): InterviewService {
   if (isUsingMockService()) {
     return createBrowserMockInterviewService();
   }
-  const baseUrl =
-    (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
-    DEFAULT_API_BASE_URL;
+  const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  const baseUrl = envBase
+    ? envBase
+    : import.meta.env.PROD
+      ? ""
+      : DEFAULT_API_BASE_URL;
   return createHttpInterviewService({ baseUrl });
 }
 

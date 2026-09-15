@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from .db import init_db
 from .routes import router
@@ -30,6 +33,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -42,3 +47,25 @@ app.include_router(router)
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+def _mount_frontend_spa(application: FastAPI) -> None:
+    static_root = os.getenv("INTERVIEW_CANVAS_STATIC_DIR", "").strip()
+    if not static_root:
+        return
+    frontend_dir = Path(static_root).resolve()
+    index_path = frontend_dir / "index.html"
+    if not index_path.is_file():
+        return
+
+    @application.get("/{path:path}", include_in_schema=False)
+    async def serve_frontend(path: str) -> FileResponse:
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        requested = (frontend_dir / path).resolve()
+        if requested.is_relative_to(frontend_dir) and requested.is_file():
+            return FileResponse(requested)
+        return FileResponse(index_path)
+
+
+_mount_frontend_spa(app)
