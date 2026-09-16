@@ -1,0 +1,35 @@
+# Module 03 — 4/7: app + Postgres in one stack.
+# App uses service hostname "postgres" (not localhost) for DATABASE_URL.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sdip
+      POSTGRES_PASSWORD: sdip
+      POSTGRES_DB: sdip
+    volumes:
+      - interview-canvas-pgdata:/var/lib/postgresql/data
+    ports:
+      # Host 5432 — stop standalone interview-canvas-db first if it binds 5432.
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sdip -d sdip"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  app:
+    build: .
+    ports:
+      # Article-style host port; container still listens on 8000.
+      - "8100:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://sdip:sdip@postgres:5432/sdip
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  # Same volume name as 3/7 standalone docker run when possible.
+  interview-canvas-pgdata:

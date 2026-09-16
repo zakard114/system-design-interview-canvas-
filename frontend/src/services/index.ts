@@ -25,11 +25,9 @@ function resolveDefaultService(): InterviewService {
     return createBrowserMockInterviewService();
   }
   const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
-  const baseUrl = envBase
-    ? envBase
-    : import.meta.env.PROD
-      ? ""
-      : DEFAULT_API_BASE_URL;
+  // Empty → same-origin (/api via Vite proxy in dev, FastAPI static in prod).
+  const baseUrl =
+    envBase !== undefined && envBase !== "" ? envBase.replace(/\/$/, "") : "";
   return createHttpInterviewService({ baseUrl });
 }
 

@@ -13,6 +13,13 @@ export default defineConfig({
   // and then cache the failure — clear node_modules/.vite and restart if it happens.
   vite: {
     server: {
+      proxy: {
+        "/api": {
+          target: "http://127.0.0.1:8000",
+          changeOrigin: true,
+          ws: true,
+        },
+      },
       warmup: {
         clientFiles: ["./src/routes/index.tsx", "./src/routes/__root.tsx"],
       },
