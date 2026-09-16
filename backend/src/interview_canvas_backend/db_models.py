@@ -1,4 +1,4 @@
-"""ORM tables for persistent store (SQLite now, Postgres later via DATABASE_URL)."""
+"""ORM tables for persistent store (SQLite default; Postgres via DATABASE_URL)."""
 
 from __future__ import annotations
 

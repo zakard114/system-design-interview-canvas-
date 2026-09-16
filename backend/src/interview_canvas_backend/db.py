@@ -30,7 +30,13 @@ def make_engine(url: str | None = None) -> Engine:
     connect_args: dict = {}
     if database_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
-    engine = create_engine(database_url, future=True, connect_args=connect_args)
+    # pool_pre_ping: drop stale Postgres connections after idle/restart.
+    engine = create_engine(
+        database_url,
+        future=True,
+        connect_args=connect_args,
+        pool_pre_ping=True,
+    )
 
     if database_url.startswith("sqlite"):
 
