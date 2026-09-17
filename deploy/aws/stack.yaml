@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Interview Canvas PoC — one EC2 runs Docker Compose (Caddy + app + Postgres).
+  Interview Canvas PoC - one EC2 runs Docker Compose (Caddy + app + Postgres).
   Delete this stack when 6/7+7/7 checks are done. Stop the instance overnight to cut CPU cost.
 
 Parameters:
@@ -30,7 +30,7 @@ Parameters:
     Type: String
     Default: t3.small
     AllowedValues: [t3.micro, t3.small, t3.medium]
-    Description: t3.small recommended — frontend build on-box needs RAM.
+    Description: t3.small recommended - frontend build on-box needs RAM.
 
   RootVolumeSize:
     Type: Number
