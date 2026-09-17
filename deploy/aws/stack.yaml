@@ -1,0 +1,270 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Interview Canvas PoC — one EC2 runs Docker Compose (Caddy + app + Postgres).
+  Delete this stack when 6/7+7/7 checks are done. Stop the instance overnight to cut CPU cost.
+
+Parameters:
+  RepoUrl:
+    Type: String
+    Default: https://github.com/zakard114/system-design-interview-canvas-.git
+    Description: Public git URL cloned onto the instance at bootstrap.
+
+  RepoRef:
+    Type: String
+    Default: main
+    Description: Branch or tag to deploy.
+
+  DomainName:
+    Type: String
+    Default: ""
+    Description: >
+      Empty = plain HTTP on :80 (fine for PoC via Elastic IP).
+      Set a DNS name pointed at the Elastic IP for Let's Encrypt HTTPS.
+
+  TlsEmail:
+    Type: String
+    Default: ""
+    Description: Let's Encrypt contact email (required if DomainName is set).
+
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.micro, t3.small, t3.medium]
+    Description: t3.small recommended — frontend build on-box needs RAM.
+
+  RootVolumeSize:
+    Type: Number
+    Default: 30
+    MinValue: 20
+    MaxValue: 100
+    Description: gp3 root disk (GB). DeleteOnTermination=true.
+
+  KeyName:
+    Type: String
+    Default: ""
+    Description: Optional EC2 key pair for SSH. Prefer SSM Session Manager if empty.
+
+  SshCidr:
+    Type: String
+    Default: ""
+    Description: Optional SSH CIDR (e.g. x.x.x.x/32). Empty = no port 22.
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+  BuildxVersion:
+    Type: String
+    Default: v0.23.0
+
+Conditions:
+  HasDomain: !Not [!Equals [!Ref DomainName, ""]]
+  HasKeyName: !Not [!Equals [!Ref KeyName, ""]]
+  HasSshCidr: !Not [!Equals [!Ref SshCidr, ""]]
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.42.0.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Interview Canvas HTTP/S (+ optional SSH)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - !If
+          - HasSshCidr
+          - IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
+            CidrIp: !Ref SshCidr
+          - !Ref AWS::NoValue
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-sg
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-eip
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      KeyName: !If [HasKeyName, !Ref KeyName, !Ref AWS::NoValue]
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: !Ref RootVolumeSize
+            Encrypted: true
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          exec > >(tee -a /var/log/interview-canvas-bootstrap.log) 2>&1
+
+          echo "=== packages ==="
+          dnf install -y docker git
+
+          case "$(uname -m)" in
+            aarch64) COMPOSE_ARCH=aarch64; BUILDX_ARCH=arm64 ;;
+            x86_64)  COMPOSE_ARCH=x86_64;  BUILDX_ARCH=amd64 ;;
+            *) echo "unsupported arch"; exit 1 ;;
+          esac
+
+          install -d /usr/local/lib/docker/cli-plugins
+          curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-${!COMPOSE_ARCH}" \
+            -o /usr/local/lib/docker/cli-plugins/docker-compose
+          curl -fsSL "https://github.com/docker/buildx/releases/download/${BuildxVersion}/buildx-${BuildxVersion}.linux-${!BUILDX_ARCH}" \
+            -o /usr/local/lib/docker/cli-plugins/docker-buildx
+          chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose \
+                     /usr/local/lib/docker/cli-plugins/docker-buildx
+
+          systemctl enable --now docker
+          usermod -aG docker ec2-user
+
+          if [ ! -f /swapfile ]; then
+            dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
+            echo "/swapfile none swap sw 0 0" >> /etc/fstab
+          fi
+
+          APP_DIR=/opt/interview-canvas
+          if [ ! -d "${!APP_DIR}/.git" ]; then
+            git clone --branch "${RepoRef}" "${RepoUrl}" "${!APP_DIR}"
+          fi
+          cd "${!APP_DIR}"
+
+          SITE_ADDRESS="${DomainName}"
+          if [ -z "${!SITE_ADDRESS}" ]; then SITE_ADDRESS=":80"; fi
+
+          if [ ! -f "${!APP_DIR}/.env" ]; then
+            umask 077
+            {
+              echo "POSTGRES_USER=sdip"
+              echo "POSTGRES_DB=sdip"
+              echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+              echo "SITE_ADDRESS=${!SITE_ADDRESS}"
+              echo "TLS_EMAIL=${TlsEmail}"
+            } > "${!APP_DIR}/.env"
+          fi
+
+          docker compose -f docker-compose.prod.yaml up -d --build
+          echo "=== bootstrap complete ==="
+
+  EipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt ElasticIp.AllocationId
+      InstanceId: !Ref Instance
+
+Outputs:
+  StackName:
+    Value: !Ref AWS::StackName
+  ElasticIp:
+    Description: Open http://THIS_IP/ when DomainName is empty; or point DNS A record here.
+    Value: !Ref ElasticIp
+  InstanceId:
+    Value: !Ref Instance
+  AppUrlHint:
+    Value: !If
+      - HasDomain
+      - !Sub https://${DomainName}/
+      - !Sub http://${ElasticIp}/
+  SsmHint:
+    Value: !Sub aws ssm start-session --target ${Instance}
+  StopHint:
+    Description: Overnight cost cut (EBS still bills; release EIP only if you also stop needing the address).
+    Value: !Sub aws ec2 stop-instances --instance-ids ${Instance}
+  DeleteHint:
+    Value: !Sub |
+      aws cloudformation delete-stack --stack-name ${AWS::StackName}
+      aws cloudformation wait stack-delete-complete --stack-name ${AWS::StackName}
