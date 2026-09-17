@@ -619,6 +619,7 @@ function SessionPage() {
           <h1 className="mt-2 text-2xl font-semibold">What should we call you?</h1>
           <input
             autoFocus
+            data-testid="join-display-name"
             value={nameInput}
             onChange={(event) => setNameInput(event.target.value)}
             placeholder="Display name"
@@ -626,6 +627,7 @@ function SessionPage() {
           />
           <button
             type="submit"
+            data-testid="enter-canvas"
             disabled={joining || !nameInput.trim()}
             className="mt-4 w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
@@ -719,13 +721,17 @@ function SessionPage() {
           <span className="mono-tag">room {session?.joinCode}</span>
           <button
             type="button"
+            data-testid="copy-join-link"
             onClick={copyLink}
             className="flex items-center gap-1.5 rounded-md border border-input px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
           >
             {copied ? <Check className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
             {copied ? "Link copied" : "Copy join link"}
           </button>
-          <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+          <span
+            data-testid="join-link"
+            className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"
+          >
             <Link2 className="size-3.5" />
             {joinLink(sessionId)}
           </span>

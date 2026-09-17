@@ -95,6 +95,7 @@ function Home() {
             <label className="mt-3 block space-y-1">
               <span className="text-xs text-muted-foreground">Your display name</span>
               <input
+                data-testid="home-display-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Interviewer"
@@ -103,6 +104,7 @@ function Home() {
             </label>
             <button
               type="button"
+              data-testid="create-session"
               onClick={createSession}
               disabled={busy}
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
@@ -116,6 +118,7 @@ function Home() {
             <label className="mt-3 block space-y-1">
               <span className="text-xs text-muted-foreground">Paste the room link</span>
               <input
+                data-testid="join-link-input"
                 value={link}
                 onChange={(event) => setLink(event.target.value)}
                 placeholder="https://…/s/abc123"
@@ -124,6 +127,7 @@ function Home() {
             </label>
             <button
               type="button"
+              data-testid="open-room"
               onClick={openLink}
               disabled={busy}
               className="mt-4 w-full rounded-md border border-input px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-accent disabled:opacity-60"

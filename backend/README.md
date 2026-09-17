@@ -75,6 +75,8 @@ docker compose up --build
 
 Stop: `Ctrl+C`, or `docker compose down` (volume `interview-canvas-pgdata` keeps data unless you `down -v`).
 
+See root `README.md` for **integration** (`tests/integration/`) and **Playwright E2E** (`e2e/`).
+
 ## Docker (Module 03 — single container)
 
 From the repository root (Docker Desktop running):
