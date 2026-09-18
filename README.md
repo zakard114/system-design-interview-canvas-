@@ -57,21 +57,37 @@ Override URL: `$env:E2E_BASE_URL="http://127.0.0.1:8100"`
 
 - `backend/` — FastAPI  
 - `frontend/` — Vite SPA  
-- `docker-compose.yaml` — local `postgres` + `app` (:8100)  
+- `docker-compose.yml` / `docker-compose.yaml` — local `postgres` + `app` (:8100)  
 - `docker-compose.prod.yaml` — Caddy + app + Postgres (AWS EC2)  
 - `deploy/aws/stack.yaml` — CloudFormation PoC  
 - `tests/integration/` — Compose-oriented integration  
 - `e2e/` — Playwright  
+- `docs/testing.md` · `docs/deployment.md` · `docs/release-process.md`  
+- `.github/workflows/ci.yml` · `deploy.yml`
 
-## CI (7/7)
+## Module 3 deliverables
 
-GitHub Actions: `.github/workflows/ci.yml` (backend pytest, frontend vitest+build, Compose integration, `docker build`).
+| Path | Status |
+|------|--------|
+| `tests/integration/` | Yes |
+| `Dockerfile` | Yes |
+| `docker-compose.yml` | Yes (alias of `.yaml`) |
+| `.github/workflows/ci.yml` | Yes (unit, lint, integration, image build) |
+| `.github/workflows/deploy.yml` | Yes (GHCR publish after green CI; optional `APP_URL` smoke) |
+| `docs/testing.md` | Yes |
+| `docs/deployment.md` | Yes |
+| `docs/release-process.md` | Yes |
 
-Green once on `main` (or a PR) is enough for this PoC. Full CD/`deploy.yml` to AWS is optional — we tear the EC2 stack down after CI.
+Public AWS URL is a **same-day PoC** (create → verify → delete). Ongoing CD to EC2 is opt-in via secrets — see `docs/deployment.md`.
+
+## CI / CD
+
+- **CI:** `.github/workflows/ci.yml` — backend pytest, frontend lint/test/build, Compose integration, `docker build`.  
+- **CD:** `.github/workflows/deploy.yml` — on successful `ci` for `main`, push image to GHCR; if repo variable `APP_URL` is set, smoke `/health`.
 
 ## AWS (6/7) — short-lived PoC
 
-**Plan:** deploy → Two-Session → 7/7 CI green once → **delete stack**.  
+**Plan:** deploy → Two-Session → 7/7 CI green → **delete stack**.  
 Overnight gap: **stop EC2** (EBS still bills). Do **not** leave Running until homework due date.
 
 ### Advice checkpoints (follow in order)
