@@ -63,9 +63,15 @@ Override URL: `$env:E2E_BASE_URL="http://127.0.0.1:8100"`
 - `tests/integration/` — Compose-oriented integration  
 - `e2e/` — Playwright  
 
+## CI (7/7)
+
+GitHub Actions: `.github/workflows/ci.yml` (backend pytest, frontend vitest+build, Compose integration, `docker build`).
+
+Green once on `main` (or a PR) is enough for this PoC. Full CD/`deploy.yml` to AWS is optional — we tear the EC2 stack down after CI.
+
 ## AWS (6/7) — short-lived PoC
 
-**Plan:** deploy → Two-Session → (soon) 7/7 CI/CD once → **delete stack**.  
+**Plan:** deploy → Two-Session → 7/7 CI green once → **delete stack**.  
 Overnight gap: **stop EC2** (EBS still bills). Do **not** leave Running until homework due date.
 
 ### Advice checkpoints (follow in order)

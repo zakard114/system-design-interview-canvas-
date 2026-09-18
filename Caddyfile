@@ -1,8 +1,4 @@
-{
-	# Set TLS_EMAIL in .env when SITE_ADDRESS is a real domain (Let's Encrypt).
-	email {$TLS_EMAIL}
-}
-
+# IP PoC: SITE_ADDRESS=:80 (HTTP only). Domain: SITE_ADDRESS=example.com and TLS_EMAIL=you@example.com
 {$SITE_ADDRESS} {
 	# Same origin for UI + API + WebSocket (no CORS drama).
 	reverse_proxy app:8000

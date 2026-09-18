@@ -22,7 +22,7 @@ import {
   type ArrowLineStyle,
   type Tool,
 } from "@/components/canvas/tools";
-import { joinLink } from "@/lib/session-link";
+import { copyTextToClipboard, joinLink } from "@/lib/session-link";
 import { clamp } from "@/lib/canvas-geometry";
 import { isUsingMockService } from "@/services";
 import type {
@@ -642,13 +642,13 @@ function SessionPage() {
   }
 
   const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(joinLink(sessionId));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
+    const ok = await copyTextToClipboard(joinLink(sessionId));
+    if (!ok) {
       setCopied(false);
+      return;
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
   };
 
   const onLeftSplitterPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
