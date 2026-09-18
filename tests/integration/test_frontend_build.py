@@ -7,9 +7,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 def test_frontend_production_build(repo_root: Path) -> None:
     frontend = repo_root / "frontend"
+    if not (frontend / "node_modules").is_dir():
+        pytest.skip(
+            "frontend/node_modules missing — covered by the frontend CI job "
+            "(or run npm ci in frontend/ locally)"
+        )
     env = os.environ.copy()
     env["VITE_USE_MOCK"] = "false"
     # Keep npm/vite caches on E: when the helper script was sourced.
@@ -32,3 +39,4 @@ def test_frontend_production_build(repo_root: Path) -> None:
         )
     index = frontend / "dist" / "client" / "index.html"
     assert index.is_file(), f"missing SPA shell: {index}"
+
