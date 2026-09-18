@@ -1,14 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Check,
-  Copy,
-  Link2,
-  PanelLeft,
-  PanelRight,
-  Radio,
-  WifiOff,
-} from "lucide-react";
+import { Check, Copy, Link2, PanelLeft, PanelRight, Radio, WifiOff } from "lucide-react";
 import { useInterviewSession } from "@/hooks/useInterviewSession";
 import { useCanvasHistory } from "@/hooks/useCanvasHistory";
 import { CanvasSurface } from "@/components/canvas/CanvasSurface";
@@ -25,12 +17,7 @@ import {
 import { copyTextToClipboard, joinLink } from "@/lib/session-link";
 import { clamp } from "@/lib/canvas-geometry";
 import { isUsingMockService } from "@/services";
-import type {
-  EdgeObject,
-  NewCanvasObject,
-  NodeObject,
-  StickyObject,
-} from "@/services";
+import type { EdgeObject, NewCanvasObject, NodeObject, StickyObject } from "@/services";
 
 export const Route = createFileRoute("/s/$sessionId")({
   head: () => ({
@@ -136,9 +123,7 @@ function readInspectorHeight(): number {
     const raw = globalThis.localStorage?.getItem(INSPECTOR_HEIGHT_KEY);
     if (!raw) return INSPECTOR_HEIGHT_DEFAULT;
     const n = Number(raw);
-    return Number.isFinite(n)
-      ? clamp(n, INSPECTOR_HEIGHT_MIN, 600)
-      : INSPECTOR_HEIGHT_DEFAULT;
+    return Number.isFinite(n) ? clamp(n, INSPECTOR_HEIGHT_MIN, 600) : INSPECTOR_HEIGHT_DEFAULT;
   } catch {
     return INSPECTOR_HEIGHT_DEFAULT;
   }
@@ -159,9 +144,7 @@ function readChromeZoom(): number {
     const raw = globalThis.localStorage?.getItem(CHROME_ZOOM_KEY);
     if (!raw) return 1;
     const n = Number(raw);
-    return Number.isFinite(n)
-      ? clamp(n, CHROME_ZOOM_MIN, CHROME_ZOOM_MAX)
-      : 1;
+    return Number.isFinite(n) ? clamp(n, CHROME_ZOOM_MIN, CHROME_ZOOM_MAX) : 1;
   } catch {
     return 1;
   }
@@ -180,9 +163,7 @@ function readLeftWidth(): number {
     const raw = globalThis.localStorage?.getItem(LEFT_WIDTH_KEY);
     if (!raw) return LEFT_WIDTH_DEFAULT;
     const n = Number(raw);
-    return Number.isFinite(n)
-      ? clamp(n, LEFT_WIDTH_MIN, LEFT_WIDTH_MAX)
-      : LEFT_WIDTH_DEFAULT;
+    return Number.isFinite(n) ? clamp(n, LEFT_WIDTH_MIN, LEFT_WIDTH_MAX) : LEFT_WIDTH_DEFAULT;
   } catch {
     return LEFT_WIDTH_DEFAULT;
   }
@@ -218,15 +199,9 @@ function SessionPage() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(readLeftWidth);
   const [penWidth, setPenWidth] = useState(DEFAULT_PEN_WIDTH);
   const [eraserSize, setEraserSize] = useState(DEFAULT_ERASER_SIZE);
-  const [arrowLineStyle, setArrowLineStyle] = useState<ArrowLineStyle>(
-    DEFAULT_ARROW_LINE_STYLE,
-  );
-  const [showLeftPanel, setShowLeftPanel] = useState(() =>
-    readPanelOpen(LEFT_PANEL_KEY, true),
-  );
-  const [showRightPanel, setShowRightPanel] = useState(() =>
-    readPanelOpen(RIGHT_PANEL_KEY, true),
-  );
+  const [arrowLineStyle, setArrowLineStyle] = useState<ArrowLineStyle>(DEFAULT_ARROW_LINE_STYLE);
+  const [showLeftPanel, setShowLeftPanel] = useState(() => readPanelOpen(LEFT_PANEL_KEY, true));
+  const [showRightPanel, setShowRightPanel] = useState(() => readPanelOpen(RIGHT_PANEL_KEY, true));
   const [chromeZoom, setChromeZoom] = useState(readChromeZoom);
   const [isLg, setIsLg] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= LG_BREAKPOINT,
@@ -264,9 +239,7 @@ function SessionPage() {
       const step = event.deltaY > 0 ? -0.08 : 0.08;
       setChromeZoom((z) => {
         const next =
-          Math.round(
-            Math.min(CHROME_ZOOM_MAX, Math.max(CHROME_ZOOM_MIN, z + step)) * 100,
-          ) / 100;
+          Math.round(Math.min(CHROME_ZOOM_MAX, Math.max(CHROME_ZOOM_MIN, z + step)) * 100) / 100;
         try {
           globalThis.localStorage?.setItem(CHROME_ZOOM_KEY, String(next));
         } catch {
@@ -299,10 +272,7 @@ function SessionPage() {
       updateObject,
     ],
   );
-  const { pushSnapshot, undo, redo, canUndo, canRedo } = useCanvasHistory(
-    objects,
-    mutators,
-  );
+  const { pushSnapshot, undo, redo, canUndo, canRedo } = useCanvasHistory(objects, mutators);
 
   const selected = useMemo(() => {
     if (selectedIds.length !== 1) return null;
@@ -347,16 +317,11 @@ function SessionPage() {
     const ids = new Set(selectedIdsRef.current);
     if (ids.size === 0) return null;
     const current = objectsRef.current;
-    const nodes = current.filter(
-      (o): o is NodeObject => o.kind === "node" && ids.has(o.id),
-    );
-    const stickies = current.filter(
-      (o): o is StickyObject => o.kind === "sticky" && ids.has(o.id),
-    );
+    const nodes = current.filter((o): o is NodeObject => o.kind === "node" && ids.has(o.id));
+    const stickies = current.filter((o): o is StickyObject => o.kind === "sticky" && ids.has(o.id));
     const nodeIds = new Set(nodes.map((n) => n.id));
     const edges = current.filter(
-      (o): o is EdgeObject =>
-        o.kind === "edge" && nodeIds.has(o.from) && nodeIds.has(o.to),
+      (o): o is EdgeObject => o.kind === "edge" && nodeIds.has(o.from) && nodeIds.has(o.to),
     );
     if (nodes.length === 0 && stickies.length === 0) return null;
     return {
@@ -530,9 +495,7 @@ function SessionPage() {
     window.addEventListener("pointerup", onUp);
   };
 
-  const onHorizontalSplitterPointerDown = (
-    event: React.PointerEvent<HTMLDivElement>,
-  ) => {
+  const onHorizontalSplitterPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (isLg) return;
     event.preventDefault();
     splittingRef.current = true;
@@ -737,7 +700,8 @@ function SessionPage() {
           </span>
           {isUsingMockService() ? (
             <span className="w-full text-[11px] leading-snug text-muted-foreground sm:w-auto">
-              Demo: paste in another tab of this browser. Other browsers won&apos;t see the room yet.
+              Demo: paste in another tab of this browser. Other browsers won&apos;t see the room
+              yet.
             </span>
           ) : null}
         </div>
@@ -778,11 +742,7 @@ function SessionPage() {
           <div
             className="relative shrink-0"
             data-chrome="tools"
-            style={
-              isLg
-                ? { width: leftPanelWidth, zoom: chromeZoom }
-                : { zoom: chromeZoom }
-            }
+            style={isLg ? { width: leftPanelWidth, zoom: chromeZoom } : { zoom: chromeZoom }}
           >
             <Toolbar
               tool={tool}
@@ -810,10 +770,7 @@ function SessionPage() {
             ) : null}
           </div>
         ) : null}
-        <div
-          ref={splitRef}
-          className="flex min-h-0 min-w-0 flex-1 flex-col lg:flex-row"
-        >
+        <div ref={splitRef} className="flex min-h-0 min-w-0 flex-1 flex-col lg:flex-row">
           <div
             className="panel min-h-0 min-w-0 flex-1 overflow-hidden"
             data-canvas-host=""
@@ -865,11 +822,7 @@ function SessionPage() {
               <div
                 className="relative shrink-0"
                 data-chrome="inspector"
-                style={
-                  isLg
-                    ? { width: inspectorWidth, zoom: chromeZoom }
-                    : { zoom: chromeZoom }
-                }
+                style={isLg ? { width: inspectorWidth, zoom: chromeZoom } : { zoom: chromeZoom }}
               >
                 {isLg ? (
                   <div
@@ -891,9 +844,7 @@ function SessionPage() {
                   onDelete={(id) => {
                     pushSnapshot();
                     const ids =
-                      selectedIds.includes(id) && selectedIds.length > 0
-                        ? selectedIds
-                        : [id];
+                      selectedIds.includes(id) && selectedIds.length > 0 ? selectedIds : [id];
                     void deleteObjects(ids);
                     setSelectedIds([]);
                   }}

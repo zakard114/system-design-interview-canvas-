@@ -6,13 +6,7 @@
  * HTTP/WebSocket client later means implementing this interface only.
  */
 
-export type NodeType =
-  | "service"
-  | "database"
-  | "queue"
-  | "cache"
-  | "loadbalancer"
-  | "llm";
+export type NodeType = "service" | "database" | "queue" | "cache" | "loadbalancer" | "llm";
 
 export type ParticipantRole = "interviewer" | "candidate";
 

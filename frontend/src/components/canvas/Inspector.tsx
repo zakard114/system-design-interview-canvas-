@@ -64,9 +64,7 @@ export function Inspector({
         <span className="mono-tag">Selection</span>
         {selectedCount > 1 ? (
           <div className="mt-2 space-y-3">
-            <p className="text-sm font-medium text-foreground">
-              {selectedCount} selected
-            </p>
+            <p className="text-sm font-medium text-foreground">{selectedCount} selected</p>
             <button
               type="button"
               onClick={onDeleteAll}
@@ -77,8 +75,7 @@ export function Inspector({
           </div>
         ) : !selected ? (
           <p className="mt-2 text-xs text-muted-foreground">
-            Pick a tool, click the board to place things. Select an object to rename or
-            delete it.
+            Pick a tool, click the board to place things. Select an object to rename or delete it.
           </p>
         ) : (
           <div className="mt-2 space-y-3">
@@ -93,11 +90,7 @@ export function Inspector({
             </p>
 
             {selected.kind === "node" ? (
-              <LabelField
-                objectId={selected.id}
-                label={selected.label}
-                onUpdate={onUpdate}
-              />
+              <LabelField objectId={selected.id} label={selected.label} onUpdate={onUpdate} />
             ) : null}
 
             {selected.kind === "edge" ? (
@@ -143,11 +136,7 @@ export function Inspector({
             ) : null}
 
             {selected.kind === "sticky" ? (
-              <StickyField
-                objectId={selected.id}
-                text={selected.text}
-                onUpdate={onUpdate}
-              />
+              <StickyField objectId={selected.id} text={selected.text} onUpdate={onUpdate} />
             ) : null}
 
             {selected.kind === "stroke" ? (
@@ -297,9 +286,7 @@ function StrokeFields({
         <span className="mono-tag">Width</span>
         <select
           value={String(width)}
-          onChange={(event) =>
-            onUpdate(objectId, { width: Number(event.target.value) })
-          }
+          onChange={(event) => onUpdate(objectId, { width: Number(event.target.value) })}
           className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring"
         >
           {[2, 4, 8, 12].map((n) => (
@@ -307,9 +294,7 @@ function StrokeFields({
               {n}px
             </option>
           ))}
-          {![2, 2.5, 4, 8].includes(width) ? (
-            <option value={width}>{width}px</option>
-          ) : null}
+          {![2, 2.5, 4, 8].includes(width) ? <option value={width}>{width}px</option> : null}
         </select>
       </label>
     </div>

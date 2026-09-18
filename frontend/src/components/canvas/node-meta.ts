@@ -1,12 +1,4 @@
-import {
-  Boxes,
-  Database,
-  Gauge,
-  ListOrdered,
-  Sparkles,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
+import { Boxes, Database, Gauge, ListOrdered, Sparkles, Zap, type LucideIcon } from "lucide-react";
 import type { NodeType } from "@/services";
 
 export interface NodeMeta {

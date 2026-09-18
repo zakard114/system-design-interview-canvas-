@@ -55,11 +55,7 @@ describe("MockInterviewService — sessions", () => {
     await service.joinSession({ sessionId: session.id, displayName: "Candidate" });
     await service.joinSession({ sessionId: session.id, displayName: "Observer" });
     const participants = await service.listParticipants(session.id);
-    expect(participants.map((p) => p.displayName)).toEqual([
-      "Host",
-      "Candidate",
-      "Observer",
-    ]);
+    expect(participants.map((p) => p.displayName)).toEqual(["Host", "Candidate", "Observer"]);
   });
 
   it("returns null for an unknown session and rejects joining it", async () => {
@@ -197,9 +193,7 @@ describe("MockInterviewService — canvas objects", () => {
     await expect(service.updateObject(session.id, "x", { label: "y" })).rejects.toBeInstanceOf(
       ObjectNotFoundError,
     );
-    await expect(service.deleteObject(session.id, "x")).rejects.toBeInstanceOf(
-      ObjectNotFoundError,
-    );
+    await expect(service.deleteObject(session.id, "x")).rejects.toBeInstanceOf(ObjectNotFoundError);
     await expect(service.listObjects("nope")).rejects.toBeInstanceOf(SessionNotFoundError);
   });
 });

@@ -134,11 +134,7 @@ export class MockInterviewService implements InterviewService {
     return this.data.sessions[sessionId] ?? null;
   }
 
-  async joinSession(input: {
-    sessionId: string;
-    displayName: string;
-    role?: ParticipantRole;
-  }) {
+  async joinSession(input: { sessionId: string; displayName: string; role?: ParticipantRole }) {
     this.hydrate();
     const session = this.requireSession(input.sessionId);
     const name = input.displayName.trim();
@@ -166,9 +162,7 @@ export class MockInterviewService implements InterviewService {
     this.hydrate();
     const list = this.data.participants[input.sessionId];
     if (!list) return;
-    this.data.participants[input.sessionId] = list.filter(
-      (p) => p.id !== input.participantId,
-    );
+    this.data.participants[input.sessionId] = list.filter((p) => p.id !== input.participantId);
     this.flush();
     this.emit({
       type: "participants_updated",
@@ -200,11 +194,7 @@ export class MockInterviewService implements InterviewService {
     return created;
   }
 
-  async updateObject(
-    sessionId: string,
-    objectId: string,
-    patch: Partial<CanvasObject>,
-  ) {
+  async updateObject(sessionId: string, objectId: string, patch: Partial<CanvasObject>) {
     this.requireSession(sessionId);
     const list = this.data.objects[sessionId] ?? [];
     const index = list.findIndex((o) => o.id === objectId);
@@ -224,7 +214,8 @@ export class MockInterviewService implements InterviewService {
     if (!list.some((o) => o.id === objectId)) throw new ObjectNotFoundError(objectId);
     // Deleting a node also removes edges attached to it.
     this.data.objects[sessionId] = list.filter(
-      (o) => o.id !== objectId && !(o.kind === "edge" && (o.from === objectId || o.to === objectId)),
+      (o) =>
+        o.id !== objectId && !(o.kind === "edge" && (o.from === objectId || o.to === objectId)),
     );
     this.flush();
     this.emit({ type: "object_deleted", sessionId, objectId });

@@ -4,11 +4,7 @@ import type { InterviewService } from "./types";
 
 export * from "./types";
 export { createMockInterviewService, MockInterviewService } from "./mock";
-export {
-  createHttpInterviewService,
-  HttpInterviewService,
-  DEFAULT_API_BASE_URL,
-} from "./http";
+export { createHttpInterviewService, HttpInterviewService, DEFAULT_API_BASE_URL } from "./http";
 
 let instance: InterviewService | null = null;
 
@@ -26,8 +22,7 @@ function resolveDefaultService(): InterviewService {
   }
   const envBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
   // Empty → same-origin (/api via Vite proxy in dev, FastAPI static in prod).
-  const baseUrl =
-    envBase !== undefined && envBase !== "" ? envBase.replace(/\/$/, "") : "";
+  const baseUrl = envBase !== undefined && envBase !== "" ? envBase.replace(/\/$/, "") : "";
   return createHttpInterviewService({ baseUrl });
 }
 

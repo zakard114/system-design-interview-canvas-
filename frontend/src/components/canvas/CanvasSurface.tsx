@@ -54,9 +54,7 @@ function readCanvasZoom(): number {
     const raw = globalThis.localStorage?.getItem(CANVAS_ZOOM_KEY);
     if (!raw) return 1;
     const n = Number(raw);
-    return Number.isFinite(n)
-      ? Math.min(CANVAS_ZOOM_MAX, Math.max(CANVAS_ZOOM_MIN, n))
-      : 1;
+    return Number.isFinite(n) ? Math.min(CANVAS_ZOOM_MAX, Math.max(CANVAS_ZOOM_MIN, n)) : 1;
   } catch {
     return 1;
   }
@@ -96,12 +94,7 @@ type GroupDrag = {
 
 type Marquee = { x0: number; y0: number; x1: number; y1: number } | null;
 
-function pointInNode(
-  node: Pick<NodeObject, "x" | "y" | "w" | "h">,
-  x: number,
-  y: number,
-  pad = 0,
-) {
+function pointInNode(node: Pick<NodeObject, "x" | "y" | "w" | "h">, x: number, y: number, pad = 0) {
   return (
     x >= node.x - pad &&
     x <= node.x + node.w + pad &&
@@ -272,18 +265,14 @@ export function CanvasSurface({
       if (!event.ctrlKey && !event.metaKey) return;
       const surface = surfaceRef.current;
       const overSurface =
-        surface != null &&
-        event.target instanceof Node &&
-        surface.contains(event.target);
+        surface != null && event.target instanceof Node && surface.contains(event.target);
       if (!overSurface) return;
       event.preventDefault();
       event.stopPropagation();
       const step = event.deltaY > 0 ? -0.08 : 0.08;
       setCanvasZoom((z) => {
         const next =
-          Math.round(
-            Math.min(CANVAS_ZOOM_MAX, Math.max(CANVAS_ZOOM_MIN, z + step)) * 100,
-          ) / 100;
+          Math.round(Math.min(CANVAS_ZOOM_MAX, Math.max(CANVAS_ZOOM_MIN, z + step)) * 100) / 100;
         try {
           globalThis.localStorage?.setItem(CANVAS_ZOOM_KEY, String(next));
         } catch {
@@ -322,10 +311,7 @@ export function CanvasSurface({
               y: toNode.y + toNode.h / 2,
             };
             const magnet = magnetConnectTip(toNode, tipGuess);
-            resolvedTo = pointToAnchor(
-              toNode,
-              magnet.grip ?? borderPoint(toNode, tipGuess),
-            );
+            resolvedTo = pointToAnchor(toNode, magnet.grip ?? borderPoint(toNode, tipGuess));
           }
           const end = {
             x: toNode.x + resolvedTo.u * toNode.w,
@@ -354,15 +340,7 @@ export function CanvasSurface({
         edgeCreateLockRef.current = false;
       }
     },
-    [
-      arrowLineStyle,
-      clearPendingEdge,
-      edgePreview,
-      nodes,
-      onCreate,
-      onSelect,
-      participantId,
-    ],
+    [arrowLineStyle, clearPendingEdge, edgePreview, nodes, onCreate, onSelect, participantId],
   );
 
   const resolveTargetTip = useCallback(
@@ -633,12 +611,7 @@ export function CanvasSurface({
       const bounds = strokeBounds(s.points, s.width / 2);
       if (bounds.w === 0 && bounds.h === 0 && s.points.length > 0) {
         const [px, py] = s.points[0]!;
-        if (
-          px >= rect.x &&
-          px <= rect.x + rect.w &&
-          py >= rect.y &&
-          py <= rect.y + rect.h
-        ) {
+        if (px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h) {
           hitIds.push(s.id);
         }
       } else if (intersects(rect, bounds)) {
@@ -647,18 +620,11 @@ export function CanvasSurface({
     }
     for (const edge of edges) {
       const fromId =
-        typeof edge.from === "string"
-          ? edge.from
-          : (edge as EdgeObject & { from_?: string }).from_;
+        typeof edge.from === "string" ? edge.from : (edge as EdgeObject & { from_?: string }).from_;
       const from = nodes.find((n) => n.id === fromId);
       const to = nodes.find((n) => n.id === edge.to);
       if (!from || !to) continue;
-      const { start, end } = edgeEndpoints(
-        from,
-        to,
-        edge.fromAnchor,
-        edge.toAnchor,
-      );
+      const { start, end } = edgeEndpoints(from, to, edge.fromAnchor, edge.toAnchor);
       const bounds = {
         x: Math.min(start.x, end.x) - 8,
         y: Math.min(start.y, end.y) - 8,
@@ -706,11 +672,7 @@ export function CanvasSurface({
       const hit = nodeAtForConnect(x, y);
       if (hit && hit.id !== fromId) {
         const resolved = resolveTargetTip(hit, x, y);
-        void createEdge(
-          fromId,
-          hit.id,
-          pendingToAnchorRef.current ?? resolved.anchor,
-        );
+        void createEdge(fromId, hit.id, pendingToAnchorRef.current ?? resolved.anchor);
         return;
       }
       let bestId: string | null = null;
@@ -727,17 +689,12 @@ export function CanvasSurface({
         bestAnchor = pointToAnchor(box, magnet.grip);
       }
       if (bestId) {
-        void createEdge(
-          fromId,
-          bestId,
-          pendingToAnchorRef.current ?? bestAnchor,
-        );
+        void createEdge(fromId, bestId, pendingToAnchorRef.current ?? bestAnchor);
       }
       return;
     }
     if (drag) {
-      const moved =
-        Math.hypot(drag.dx, drag.dy) >= CLICK_MOVE_THRESHOLD;
+      const moved = Math.hypot(drag.dx, drag.dy) >= CLICK_MOVE_THRESHOLD;
       if (moved) {
         pendingSoloSelectRef.current = null;
         onBeforeMoveCommit?.();
@@ -764,10 +721,7 @@ export function CanvasSurface({
     }
   };
 
-  const startObjectInteraction = (
-    event: React.PointerEvent,
-    object: NodeObject | StickyObject,
-  ) => {
+  const startObjectInteraction = (event: React.PointerEvent, object: NodeObject | StickyObject) => {
     if (tool.kind === "pen" || tool.kind === "eraser") return;
     event.stopPropagation();
 
@@ -846,9 +800,7 @@ export function CanvasSurface({
     pendingSoloSelectRef.current = null;
 
     if (mod) {
-      nextSelection = cur.includes(s.id)
-        ? cur.filter((id) => id !== s.id)
-        : [...cur, s.id];
+      nextSelection = cur.includes(s.id) ? cur.filter((id) => id !== s.id) : [...cur, s.id];
       onSelect(nextSelection);
       return;
     }
@@ -863,17 +815,12 @@ export function CanvasSurface({
   };
 
   const cursor =
-    tool.kind === "pen" ||
-    tool.kind === "eraser" ||
-    tool.kind === "select" ||
-    tool.kind === "arrow"
+    tool.kind === "pen" || tool.kind === "eraser" || tool.kind === "select" || tool.kind === "arrow"
       ? "crosshair"
       : "copy";
 
   const edgePointerClass =
-    tool.kind === "select"
-      ? "pointer-events-auto cursor-pointer"
-      : "pointer-events-none";
+    tool.kind === "select" ? "pointer-events-auto cursor-pointer" : "pointer-events-none";
 
   const selectedSet = new Set(selectedIds);
   const marqueeRect = marquee ? normalizeRect(marquee) : null;
@@ -930,12 +877,7 @@ export function CanvasSurface({
             if (!from || !to) return null;
             const fromPos = { ...from, ...positionOf(from) };
             const toPos = { ...to, ...positionOf(to) };
-            const { start, end } = edgeEndpoints(
-              fromPos,
-              toPos,
-              edge.fromAnchor,
-              edge.toAnchor,
-            );
+            const { start, end } = edgeEndpoints(fromPos, toPos, edge.fromAnchor, edge.toAnchor);
             const active = selectedSet.has(edge.id);
             const dash = strokeDasharray(edge.lineStyle ?? "solid");
             const curved = (edge.pathStyle ?? "straight") === "curved";
@@ -962,12 +904,7 @@ export function CanvasSurface({
               >
                 {curved ? (
                   <>
-                    <path
-                      d={pathD}
-                      fill="none"
-                      stroke="transparent"
-                      strokeWidth={14}
-                    />
+                    <path d={pathD} fill="none" stroke="transparent" strokeWidth={14} />
                     <path
                       d={pathD}
                       fill="none"
@@ -1131,9 +1068,7 @@ export function CanvasSurface({
               y={connectGrip.y - (connectGrip.locked ? 3 : 2.5)}
               width={connectGrip.locked ? 6 : 5}
               height={connectGrip.locked ? 6 : 5}
-              fill={
-                connectGrip.locked ? "rgba(45, 212, 191, 0.35)" : "transparent"
-              }
+              fill={connectGrip.locked ? "rgba(45, 212, 191, 0.35)" : "transparent"}
               stroke="rgba(255, 255, 255, 0.92)"
               strokeWidth={0.75}
               pointerEvents="none"
@@ -1247,9 +1182,7 @@ export function CanvasSurface({
                   {meta.label}
                 </span>
               </div>
-              <div className="truncate text-sm font-medium text-foreground">
-                {node.label}
-              </div>
+              <div className="truncate text-sm font-medium text-foreground">{node.label}</div>
             </div>
           );
         })}

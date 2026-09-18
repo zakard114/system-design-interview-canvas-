@@ -6,7 +6,7 @@
 |-------|---------|--------|
 | Backend unit | `cd backend && uv sync --group dev && uv run pytest -q` | SQLite by default |
 | Frontend unit | `cd frontend && npm install && npm test` | Vitest |
-| Frontend lint | `cd frontend && npm run lint` | ESLint (CI runs this; `continue-on-error` until the Lovable surface is cleaned) |
+| Frontend lint | `cd frontend && npm run lint` | ESLint + Prettier (`endOfLine: lf`) |
 | Frontend build | `cd frontend && npm run build` | `VITE_USE_MOCK=false` for real API shell |
 | Integration | Compose up, then `uv run pytest ../tests/integration -q` | Needs `http://127.0.0.1:8100/health` |
 | E2E | `cd e2e && npm test` (Playwright Two-Session) | Optional; browsers on E: cache locally |

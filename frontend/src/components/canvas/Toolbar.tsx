@@ -248,12 +248,7 @@ function ArrowStyleFlyout({
           >
             <svg width="40" height="12" aria-hidden>
               {style === "curved" ? (
-                <path
-                  d="M2 10 Q20 0 38 10"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
+                <path d="M2 10 Q20 0 38 10" fill="none" stroke="currentColor" strokeWidth="2" />
               ) : (
                 <line
                   x1="2"

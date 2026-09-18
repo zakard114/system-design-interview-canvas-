@@ -44,8 +44,6 @@ jobs:
       - name: npm install
         run: npm install --no-fund --no-audit
       - name: npm run lint
-        # Lovable-era frontend may still warn/error; keep the gate visible without blocking ship.
-        continue-on-error: true
         run: npm run lint
       - name: npm test
         run: npm test

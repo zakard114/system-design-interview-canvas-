@@ -85,8 +85,8 @@ function Home() {
           <span className="text-primary">Both sides drawing.</span>
         </h1>
         <p className="mt-5 max-w-xl text-base text-muted-foreground">
-          Start a room, send the link, and sketch the architecture together — boxes,
-          arrows, notes and freehand strokes appear for everyone as they happen.
+          Start a room, send the link, and sketch the architecture together — boxes, arrows, notes
+          and freehand strokes appear for everyone as they happen.
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -158,9 +158,9 @@ function Home() {
           <Radio className="mt-0.5 size-3.5 shrink-0 text-primary" />
           {mockMode ? (
             <span>
-              Demo mode: rooms live in this browser&apos;s localStorage and sync across
-              tabs. A join link in another browser (or private window) will not see the
-              room until a real backend is connected.
+              Demo mode: rooms live in this browser&apos;s localStorage and sync across tabs. A join
+              link in another browser (or private window) will not see the room until a real backend
+              is connected.
             </span>
           ) : (
             <span>Connected to the API — rooms are shared across browsers.</span>

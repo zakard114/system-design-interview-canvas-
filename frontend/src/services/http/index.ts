@@ -60,11 +60,7 @@ export class HttpInterviewService implements InterviewService {
     return (await res.json()) as Session;
   }
 
-  async joinSession(input: {
-    sessionId: string;
-    displayName: string;
-    role?: ParticipantRole;
-  }) {
+  async joinSession(input: { sessionId: string; displayName: string; role?: ParticipantRole }) {
     const body: { displayName: string; role?: ParticipantRole } = {
       displayName: input.displayName,
     };
@@ -77,11 +73,9 @@ export class HttpInterviewService implements InterviewService {
   }
 
   async leaveSession(input: { sessionId: string; participantId: string }) {
-    await this.requestEmpty(
-      "POST",
-      `/api/sessions/${encodeURIComponent(input.sessionId)}/leave`,
-      { participantId: input.participantId },
-    );
+    await this.requestEmpty("POST", `/api/sessions/${encodeURIComponent(input.sessionId)}/leave`, {
+      participantId: input.participantId,
+    });
   }
 
   async listParticipants(sessionId: string) {
@@ -108,11 +102,7 @@ export class HttpInterviewService implements InterviewService {
     return normalizeCanvasObject(created);
   }
 
-  async updateObject(
-    sessionId: string,
-    objectId: string,
-    patch: Partial<CanvasObject>,
-  ) {
+  async updateObject(sessionId: string, objectId: string, patch: Partial<CanvasObject>) {
     const updated = await this.requestJson<CanvasObject>(
       "PATCH",
       `/api/sessions/${encodeURIComponent(sessionId)}/objects/${encodeURIComponent(objectId)}`,
@@ -152,10 +142,7 @@ export class HttpInterviewService implements InterviewService {
     const existing = this.sockets.get(sessionId);
     if (existing && existing.readyState <= WebSocket.OPEN) return;
 
-    const url = toWsUrl(
-      this.baseUrl,
-      `/api/sessions/${encodeURIComponent(sessionId)}/ws`,
-    );
+    const url = toWsUrl(this.baseUrl, `/api/sessions/${encodeURIComponent(sessionId)}/ws`);
     const ws = new WebSocket(url);
     this.sockets.set(sessionId, ws);
 
@@ -183,11 +170,7 @@ export class HttpInterviewService implements InterviewService {
     };
   }
 
-  private async requestJson<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<T> {
+  private async requestJson<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, this.buildInit(method, body));
     if (!res.ok) await this.throwFromResponse(res);
     if (res.status === 204) return undefined as T;

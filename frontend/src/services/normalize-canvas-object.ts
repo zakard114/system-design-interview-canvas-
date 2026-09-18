@@ -37,9 +37,7 @@ export function mergeEdgeEndpoints<T extends { kind?: string; id: string }>(
     (b && typeof b.from_ === "string" && b.from_) ||
     undefined;
   const to =
-    (typeof a.to === "string" && a.to) ||
-    (b && typeof b.to === "string" && b.to) ||
-    undefined;
+    (typeof a.to === "string" && a.to) || (b && typeof b.to === "string" && b.to) || undefined;
   if (!from || !to) return normalizeCanvasObject(primary);
   return normalizeCanvasObject({ ...primary, from, to } as T);
 }

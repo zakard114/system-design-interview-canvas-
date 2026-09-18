@@ -128,14 +128,10 @@ export function useCanvasHistory(objects: CanvasObject[], mutators: Mutators) {
           ),
         );
 
-        await Promise.all(
-          toUpdate.map((o) => mutators.updateObject(o.id, patchFrom(o))),
-        );
+        await Promise.all(toUpdate.map((o) => mutators.updateObject(o.id, patchFrom(o))));
 
         const nonEdges = missing.filter((o) => o.kind !== "edge");
-        const edges = missing.filter(
-          (o): o is EdgeObject => o.kind === "edge",
-        );
+        const edges = missing.filter((o): o is EdgeObject => o.kind === "edge");
 
         const createdNodes = await Promise.all(
           nonEdges.map(async (obj) => {
@@ -149,9 +145,7 @@ export function useCanvasHistory(objects: CanvasObject[], mutators: Mutators) {
           edges.map(async (edge) => {
             const from = idMap.get(edge.from) ?? edge.from;
             const to = idMap.get(edge.to) ?? edge.to;
-            const created = await mutators.createObjectRemote(
-              edgeCreateBody(edge, from, to),
-            );
+            const created = await mutators.createObjectRemote(edgeCreateBody(edge, from, to));
             idMap.set(edge.id, created.id);
             return created;
           }),
@@ -164,11 +158,7 @@ export function useCanvasHistory(objects: CanvasObject[], mutators: Mutators) {
             return patch ?? o;
           });
 
-        const final = [
-          ...kept.map((o) => remapObject(o, idMap)),
-          ...createdNodes,
-          ...createdEdges,
-        ];
+        const final = [...kept.map((o) => remapObject(o, idMap)), ...createdNodes, ...createdEdges];
         // Dedupe by id
         const byId = new Map(final.map((o) => [o.id, o]));
         const unique = [...byId.values()];

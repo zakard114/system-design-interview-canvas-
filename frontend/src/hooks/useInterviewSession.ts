@@ -9,10 +9,7 @@ import {
   type ParticipantRole,
   type Session,
 } from "@/services";
-import {
-  mergeEdgeEndpoints,
-  normalizeCanvasObject,
-} from "@/services/normalize-canvas-object";
+import { mergeEdgeEndpoints, normalizeCanvasObject } from "@/services/normalize-canvas-object";
 import { shouldApplyRemoteObjectUpdate } from "./remote-object-update";
 
 export type ConnectionState = "connecting" | "live" | "error";
@@ -41,10 +38,7 @@ export function readStoredParticipant(sessionId: string): Participant | null {
 
 export function storeParticipant(participant: Participant) {
   try {
-    globalThis.sessionStorage?.setItem(
-      meKey(participant.sessionId),
-      JSON.stringify(participant),
-    );
+    globalThis.sessionStorage?.setItem(meKey(participant.sessionId), JSON.stringify(participant));
   } catch {
     /* ignore */
   }
@@ -126,12 +120,7 @@ export function useInterviewSession(sessionId: string) {
             const edge = incoming as EdgeObject;
             next = prev.filter(
               (o) =>
-                !(
-                  o.kind === "edge" &&
-                  isLocalId(o.id) &&
-                  o.from === edge.from &&
-                  o.to === edge.to
-                ),
+                !(o.kind === "edge" && isLocalId(o.id) && o.from === edge.from && o.to === edge.to),
             );
           }
           return [...next, incoming];
@@ -143,9 +132,7 @@ export function useInterviewSession(sessionId: string) {
           return;
         }
         const incoming = normalizeCanvasObject(event.object);
-        setObjects((prev) =>
-          prev.map((o) => (o.id === incoming.id ? incoming : o)),
-        );
+        setObjects((prev) => prev.map((o) => (o.id === incoming.id ? incoming : o)));
         return;
       }
       if (event.type === "object_deleted") {
@@ -202,22 +189,14 @@ export function useInterviewSession(sessionId: string) {
       setObjects((prev) => [...prev, optimistic]);
       try {
         const createdRaw = await service.createObject(sessionId, object);
-        const created = mergeEdgeEndpoints(
-          normalizeCanvasObject(createdRaw),
-          optimistic,
-        );
+        const created = mergeEdgeEndpoints(normalizeCanvasObject(createdRaw), optimistic);
         setObjects((prev) => {
           let next = prev.filter((o) => o.id !== optimisticId);
           if (created.kind === "edge") {
             const edge = created as EdgeObject;
             next = next.filter(
               (o) =>
-                !(
-                  o.kind === "edge" &&
-                  isLocalId(o.id) &&
-                  o.from === edge.from &&
-                  o.to === edge.to
-                ),
+                !(o.kind === "edge" && isLocalId(o.id) && o.from === edge.from && o.to === edge.to),
             );
           }
           const idx = next.findIndex((o) => o.id === created.id);
@@ -283,8 +262,7 @@ export function useInterviewSession(sessionId: string) {
       setObjects((prev) =>
         prev.filter(
           (o) =>
-            o.id !== objectId &&
-            !(o.kind === "edge" && (o.from === objectId || o.to === objectId)),
+            o.id !== objectId && !(o.kind === "edge" && (o.from === objectId || o.to === objectId)),
         ),
       );
       try {

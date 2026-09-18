@@ -14,10 +14,7 @@ export const nodeCenter = (node: Pick<NodeObject, "x" | "y" | "w" | "h">): Point
  * Point where the line from a node's center toward `target` exits the node box.
  * Keeps arrows attached to box edges instead of centers.
  */
-export function borderPoint(
-  node: Pick<NodeObject, "x" | "y" | "w" | "h">,
-  target: Point,
-): Point {
+export function borderPoint(node: Pick<NodeObject, "x" | "y" | "w" | "h">, target: Point): Point {
   const c = nodeCenter(node);
   const dx = target.x - c.x;
   const dy = target.y - c.y;
@@ -53,10 +50,7 @@ export function simplifyStroke(
   const out: Array<[number, number]> = [];
   for (const point of points) {
     const last = out[out.length - 1];
-    if (
-      !last ||
-      Math.hypot(point[0] - last[0], point[1] - last[1]) >= minDistance
-    ) {
+    if (!last || Math.hypot(point[0] - last[0], point[1] - last[1]) >= minDistance) {
       out.push(point);
     }
   }
@@ -236,8 +230,7 @@ export function magnetConnectTip(box: Box, cursor: Point): ConnectMagnetResult {
   }
   if (bestDist <= CONNECT_ATTRACT) {
     // Ease-in: slides, then snaps as distance closes.
-    const t =
-      1 - (bestDist - CONNECT_MAGNET) / (CONNECT_ATTRACT - CONNECT_MAGNET);
+    const t = 1 - (bestDist - CONNECT_MAGNET) / (CONNECT_ATTRACT - CONNECT_MAGNET);
     const pull = 0.35 + 0.65 * (t * t);
     return {
       tip: {
@@ -373,4 +366,3 @@ export function snapBoxDelta(
 
   return { dx: bestDx, dy: bestDy, guides };
 }
-

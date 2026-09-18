@@ -69,10 +69,7 @@ export function createBroadcastChannelPort(name = "idc.session-events"): Broadca
  * Cross-tab fallback when BroadcastChannel is unavailable.
  * Fires only in *other* tabs after localStorage.setItem.
  */
-export function listenStorageKey(
-  key: string,
-  onChange: () => void,
-): () => void {
+export function listenStorageKey(key: string, onChange: () => void): () => void {
   if (typeof window === "undefined" || typeof window.addEventListener !== "function") {
     return () => {};
   }
