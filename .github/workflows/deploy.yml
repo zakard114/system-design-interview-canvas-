@@ -30,10 +30,14 @@ jobs:
         id: meta
         run: |
           owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          repo=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          # Repo name ends with "-" (system-design-interview-canvas-) which is an
+          # invalid container reference; strip trailing punctuation and use a safe slug.
+          repo=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//')
+          if [ -z "$repo" ]; then repo=interview-canvas; fi
           sha="${{ github.event.workflow_run.head_sha }}"
           echo "image=ghcr.io/${owner}/${repo}" >> "$GITHUB_OUTPUT"
           echo "tags=ghcr.io/${owner}/${repo}:main,ghcr.io/${owner}/${repo}:${sha}" >> "$GITHUB_OUTPUT"
+          echo "Using image ghcr.io/${owner}/${repo}"
 
       - uses: docker/setup-buildx-action@v3
 
